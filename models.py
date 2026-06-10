@@ -13,3 +13,4 @@ class Email:
     attachment_size: int
     is_newsletter: bool     
     unsubscribe: str = ""
+    internal_date: int = 0

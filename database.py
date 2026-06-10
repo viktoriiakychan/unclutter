@@ -22,7 +22,8 @@ def create_table():
             attachment_count INTEGER,
             attachment_size INTEGER,
             is_newsletter INTEGER,
-            unsubscribe TEXT
+            unsubscribe TEXT,
+            internal_date INTEGER
         )
     """)
 
@@ -40,10 +41,10 @@ def save_emails(emails):
 
     for email in emails:
         cursor.execute("""
-            INSERT OR REPLACE INTO emails
+           INSERT OR REPLACE INTO emails
             (id, thread_id, sender_name, sender_email, subject, date,
-             unread, attachment_count, attachment_size, is_newsletter, unsubscribe)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             unread, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             email.id,
             email.thread_id,
@@ -55,7 +56,8 @@ def save_emails(emails):
             email.attachment_count,
             email.attachment_size,
             1 if email.is_newsletter else 0,
-            email.unsubscribe
+            email.unsubscribe,
+            email.internal_date
         ))
 
     conn.commit()
@@ -84,8 +86,17 @@ def load_emails():
             attachment_count=row[7],
             attachment_size=row[8],
             is_newsletter=bool(row[9]),     # 1/0 back to True/False
-            unsubscribe=row[10]
+            unsubscribe=row[10],
+            internal_date=row[11]
         )
         emails.append(email)
 
     return emails
+
+
+def clear_emails():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM emails")
+    conn.commit()
+    conn.close()

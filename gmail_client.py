@@ -182,7 +182,8 @@ class GmailClient:
                 attachment_count=attachment_count,
                 attachment_size=attachment_size,
                 is_newsletter = is_newsletter,
-                unsubscribe=unsubscribe
+                unsubscribe=unsubscribe, 
+                internal_date=int(msg.get("internalDate", 0))
             )
 
             emails.append(email)
