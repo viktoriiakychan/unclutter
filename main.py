@@ -3,6 +3,9 @@ from googleapiclient.discovery import build
 
 from gmail_client import GmailClient
 import analytics
+import database
+
+MAX_EMAIL = 50
 
 def confirm_and_trash(gmail, emails_to_trash):
     if not emails_to_trash:
@@ -23,9 +26,15 @@ def confirm_and_trash(gmail, emails_to_trash):
         print("Cancelled. Nothing was trashed.")
         return False
 
+def sync(gmail):
+    fetched = gmail.get_emails(MAX_EMAIL)
+    database.save_emails(fetched)
+    return database.load_emails()
 
 gmail = GmailClient()
-emails = gmail.get_emails(10)
+database.create_table()
+emails = database.load_emails()
+
 
 while True:
     print("\n===== Menu =====")
@@ -34,6 +43,8 @@ while True:
     print("3. Archive emails")
     print("4. Delete emails")
     print("5. Clean up by sender")
+    print("6. Print unsubscribe links")
+    print("7. Sync from Gmail")
     print("0. Exit")
 
     choice = input("\nSelect an option: ")
@@ -50,9 +61,9 @@ while True:
         print("Unread count:", unread_count)
 
         newsletter_ids = [e.id for e in emails if e.is_newsletter]
-        gmail.mark_as_read(newsletter_ids[:10])
+        gmail.mark_as_read(newsletter_ids)
 
-        emails = gmail.get_emails(10)
+        emails = sync(gmail)
 
         unread_count = analytics.get_unread_emails(emails)
         print("Unread count:", unread_count)
@@ -60,14 +71,17 @@ while True:
     elif choice == "3":
         print("Archiving emails...")
         newsletter_ids = [e.id for e in emails if e.is_newsletter]
-        gmail.archive(newsletter_ids[:10])   
+        gmail.archive(newsletter_ids)   
+        emails = sync(gmail)
+
     elif choice == "4":
         print("Deleting emails...")
         
-        to_trash = [e for e in emails if e.is_newsletter][:10]
+        to_trash = [e for e in emails if e.is_newsletter]
 
         if confirm_and_trash(gmail, to_trash):
-            emails = gmail.get_emails(10)
+            emails = sync(gmail)
+
 
     elif choice == "5":
         sender_counts = analytics.get_sender_counts(emails)
@@ -75,7 +89,8 @@ while True:
         # print the senders and the number of emails from them in descending order
         print()
         sender_num = 1
-        for sender, count in sender_counts.most_common():
+        senders = sender_counts.most_common()
+        for sender, count in senders:
             print(f"{sender_num}. {sender}: {count}")
             sender_num+=1
 
@@ -86,13 +101,13 @@ while True:
             continue   
 
         num = int(raw)
-
+        
         if num < 1 or num > len(senders):
             print("That number isn't in the list. Try again.")
             continue
 
-        curr_sender = sender_counts.most_common()[num-1]
-        curr_sender_email = sender_counts.most_common()[num-1][0]
+        curr_sender = senders[num-1]
+        curr_sender_email = senders[num-1][0]
         print("\nWorking with", curr_sender[0])
 
         print("Select what you would like to do with the emails from this sender:\n")
@@ -117,16 +132,18 @@ while True:
         if action == 1:
             ids = [e.id for e in curr_sender_emails]
             gmail.mark_as_read(ids)
-            emails = gmail.get_emails(10)
+            emails = sync(gmail)
 
         elif action == 2:
             ids = [e.id for e in curr_sender_emails]
             gmail.archive(ids)
-            emails = gmail.get_emails(10)
+            emails = sync(gmail)
+
 
         elif action == 3:
             if confirm_and_trash(gmail, curr_sender_emails):
-                emails = gmail.get_emails(10)
+                emails = sync(gmail)
+
 
     elif choice == "6":
         seen_senders = set()
@@ -141,6 +158,13 @@ while True:
                     print(f"\n{e.sender_name}:\n  {link}")
                 else:
                     print(f"\n{e.sender_name}: (no web unsubscribe link)")
+    
+    elif choice == "7":
+        print("Fetching from Gmail...")
+        fetched = gmail.get_emails(MAX_EMAIL)     
+        database.save_emails(fetched)
+        emails = database.load_emails()     
+        print(f"Synced. {len(emails)} emails loaded.")
 
     elif choice == "0":
         print("Goodbye!")

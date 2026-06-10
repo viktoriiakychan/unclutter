@@ -12,4 +12,4 @@ class Email:
     attachment_count: int
     attachment_size: int
     is_newsletter: bool
-    unsubscribe: ""
+    unsubscribe: str = ""

@@ -5,9 +5,9 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from email.utils import parseaddr
+import time
 
 from models import Email
-
 
 
 class GmailClient:
@@ -90,23 +90,29 @@ class GmailClient:
 
         def handle_response(request_id, response, exception):
             if exception is not None:
-                print("Failed to fetch", request_id, exception)
+                if "429" not in str(exception):
+                    print("Failed to fetch", request_id, exception)
                 return
             full_messages[request_id] = response
 
-        batch = self.service.new_batch_http_request(
-            callback=handle_response
-        )
+        # send in smaller chunks 
+        for i in range(0, len(messages), 5):
+            chunk = messages[i:i+5]
 
-        for message in messages:
-            batch.add(
-                self.service.users().messages().get(
-                    userId="me",
-                    id=message["id"]    
-                ),
-                request_id= message["id"]
+            batch = self.service.new_batch_http_request(
+                callback=handle_response
             )
-        batch.execute()    
+
+            for message in messages:
+                batch.add(
+                    self.service.users().messages().get(
+                        userId="me",
+                        id=message["id"]    
+                    ),
+                    request_id= message["id"]
+                )
+            batch.execute()
+            time.sleep(1.0)
 
         emails = []
 
