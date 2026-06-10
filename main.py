@@ -31,10 +31,29 @@ def sync(gmail):
     database.save_emails(fetched)
     return database.load_emails()
 
+def confirm_and_trash(gmail, emails_to_trash):
+    if not emails_to_trash:
+        print("Nothing to trash.")
+        return False
+
+    print(f"\nThe following {len(emails_to_trash)} emails will be moved to Trash:")
+    for e in emails_to_trash:
+        print(f"  - {e.sender_name}: {e.subject}")
+
+    confirm = input("\nTrash these? Type 'yes' to confirm: ")
+
+    if confirm.lower() == "yes":
+        ids = [e.id for e in emails_to_trash]
+        gmail.trash(ids)
+        return True
+    else:
+        print("Cancelled. Nothing was trashed.")
+        return False
+
+
 gmail = GmailClient()
 database.create_table()
 emails = database.load_emails()
-
 
 while True:
     print("\n===== Menu =====")
@@ -71,17 +90,25 @@ while True:
     elif choice == "3":
         print("Archiving emails...")
         newsletter_ids = [e.id for e in emails if e.is_newsletter]
+<<<<<<< HEAD
         gmail.archive(newsletter_ids)   
         emails = sync(gmail)
 
+=======
+        gmail.archive(newsletter_ids[:10])   
+>>>>>>> 835b4e1ec9c2c8cb06ca7a58fea7cac363d2aa5a
     elif choice == "4":
         print("Deleting emails...")
         
         to_trash = [e for e in emails if e.is_newsletter]
 
         if confirm_and_trash(gmail, to_trash):
+<<<<<<< HEAD
             emails = sync(gmail)
 
+=======
+            emails = gmail.get_emails(10)
+>>>>>>> 835b4e1ec9c2c8cb06ca7a58fea7cac363d2aa5a
 
     elif choice == "5":
         sender_counts = analytics.get_sender_counts(emails)
@@ -142,6 +169,7 @@ while True:
 
         elif action == 3:
             if confirm_and_trash(gmail, curr_sender_emails):
+<<<<<<< HEAD
                 emails = sync(gmail)
 
 
@@ -153,11 +181,24 @@ while True:
                     continue
                 seen_senders.add(e.sender_email)
 
+=======
+                emails = gmail.get_emails(10)
+
+    elif choice == "6":
+        seen_senders = set()
+        for e in emails:
+            if e.is_newsletter:
+                if e.sender_email in seen_senders:
+                    continue
+                seen_senders.add(e.sender_email)
+
+>>>>>>> 835b4e1ec9c2c8cb06ca7a58fea7cac363d2aa5a
                 link = analytics.get_unsubscribe_link(e.unsubscribe)
                 if link:
                     print(f"\n{e.sender_name}:\n  {link}")
                 else:
                     print(f"\n{e.sender_name}: (no web unsubscribe link)")
+<<<<<<< HEAD
     
     elif choice == "7":
         print("Fetching from Gmail...")
@@ -165,6 +206,8 @@ while True:
         database.save_emails(fetched)
         emails = database.load_emails()     
         print(f"Synced. {len(emails)} emails loaded.")
+=======
+>>>>>>> 835b4e1ec9c2c8cb06ca7a58fea7cac363d2aa5a
 
     elif choice == "0":
         print("Goodbye!")
