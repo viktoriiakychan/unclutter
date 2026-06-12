@@ -184,7 +184,7 @@ while True:
         emails = trash_emails(gmail, emails)
 
     elif choice == "5":
-        email = clean_up_by_sender(gmail, emails)
+        emails = clean_up_by_sender(gmail, emails)
 
 
     elif choice == "6":

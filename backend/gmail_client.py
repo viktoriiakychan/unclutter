@@ -32,7 +32,7 @@ class GmailClient:
                 creds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    "credentials.json",
+                    "backend/credentials.json",
                     self.SCOPES
                 )
                 creds = flow.run_local_server(port=0)

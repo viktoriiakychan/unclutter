@@ -95,6 +95,7 @@ def load_emails():
 
 
 def clear_emails():
+    create_table()
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM emails")
