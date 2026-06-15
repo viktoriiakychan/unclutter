@@ -96,12 +96,22 @@ class GmailClient:
         return count, total_size
 
     def get_emails(self, limit=100):
+        # request gmail for you recent message ids
+        # self.service = connection to gmail, knows how to talk to it
+        # .users() -> users sectoion of gmail api
+        # .messages() -> work with emails
+        # .list(...) -> list the messges - userId="me" = logged-in user ...
+        # execute - sends the request 
+
+        # .list(...) e.g. .list(userId="me", maxResults=100) = give me a list of WHICH emails exist - ids 
+        # .get(...) e.g. .get(userId="me", id=message["id"]) = give full detauls for a specific email id
+
         results = self.service.users().messages().list(
             userId="me",
             maxResults=limit
         ).execute()
         messages = results.get("messages", [])
-        return self._fetch_full(messages)   # ← delegate to shared method
+        return self._fetch_full(messages) 
 
 
     def _fetch_full(self, messages):
@@ -118,10 +128,12 @@ class GmailClient:
         for i in range(0, len(messages), 5):
             chunk = messages[i:i+5]
 
+            # create an empty batch 
             batch = self.service.new_batch_http_request(
-                callback=handle_response
+                callback=handle_response # the results come back through here
             )
 
+            # loops over 5 emails and adds the get request in the batch
             for message in chunk:
                 batch.add(
                     self.service.users().messages().get(
@@ -130,7 +142,7 @@ class GmailClient:
                     ),
                     request_id= message["id"]
                 )
-            batch.execute()
+            batch.execute() # sends the batch to gmail to execute 
             time.sleep(0.2)
 
         emails = []
@@ -172,7 +184,6 @@ class GmailClient:
                     is_newsletter = True
                     unsubscribe = header["value"]
 
-
             attachment_count, attachment_size = (
                 self.attachment_stats(
                     payload.get(
@@ -184,6 +195,21 @@ class GmailClient:
             
             sender_name, sender_email = parseaddr(sender)
 
+            labels = msg.get("labelIds", [])
+            
+            category = "other"
+
+            if "CATEGORY_PROMOTIONS" in labels:
+                category = "promotions"
+            elif "CATEGORY_SOCIAL" in labels:
+                category = "social"
+            elif "CATEGORY_UPDATES" in labels:
+                category = "updates"
+            elif "CATEGORY_FORUMS" in labels:
+                category = "forums"
+            else:
+                category = "other"       
+
             email = Email(
                 id=msg["id"],
                 thread_id=msg["threadId"],
@@ -191,13 +217,10 @@ class GmailClient:
                 sender_email=sender_email,
                 subject=subject,
                 date=date,
-                unread=(
-                    "UNREAD"
-                    in msg.get(
-                        "labelIds",
-                        []
-                    )
-                ),
+                unread=("UNREAD" in labels),
+
+                category=category,
+                
                 attachment_count=attachment_count,
                 attachment_size=attachment_size,
                 is_newsletter = is_newsletter,
@@ -206,30 +229,6 @@ class GmailClient:
             )
 
             emails.append(email)
-
-        return emails
-
-    def get_all_message_ids(self):
-
-        emails = []
-        page_token = None
-
-        while True:
-
-            results = self.service.users().messages().list(
-                userId="me",
-                maxResults=500,
-                pageToken=page_token
-            ).execute()
-
-            messages = results.get("messages", [])
-
-            emails.extend(messages)
-
-            page_token = results.get("nextPageToken")
-
-            if not page_token:
-                break
 
         return emails
 
@@ -270,14 +269,14 @@ class GmailClient:
         }
 
     def get_new_emails(self, existing_ids, limit=100):
-        # 1 get the recent message ids
+        # get the recent message IDS!!! 
         results = self.service.users().messages().list(
             userId="me",
             maxResults=limit
         ).execute()
-        messages = results.get("messages", [])
+        messages = results.get("messages", []) # just acccess the messages 
 
-        # 2 keep only ids we dont already have 
+        # keep only ids we dont already have 
         new_messages = [m for m in messages if m["id"] not in existing_ids]
 
         if not new_messages:

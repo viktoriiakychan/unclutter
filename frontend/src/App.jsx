@@ -1,16 +1,19 @@
 import { useState, useEffect } from "react";
+import unreadIcon from "./assets/unread-message.png";
+import newsletterIcon from "./assets/newspaper.png";
+import promotionIcon from "./assets/promotions.png";
+import totalIcon from "./assets/email.png";
 
 const API = "http://localhost:5000";
 
-// ============================================================
-//  APP — the login gate. Decides what to show on page load.
-// ============================================================
+// GET = retrieve data / get data -> backend just sends the stuff 
+// POST = do something / want the server to acc do something or create / update data
+
 function App() {
   // checking → loading → loggedOut → ready
   const [phase, setPhase] = useState("checking");
   const [emails, setEmails] = useState([]);
 
-  // runs once, the moment the page opens
   useEffect(() => {
     checkLogin();
   }, []);
@@ -107,40 +110,41 @@ function CenterMessage({ text }) {
 function Dashboard({ emails }) {
   // stats computed from the real data
   const unreadCount = emails.filter((e) => e.unread).length;
+  const promotionsCount = emails.filter((e) => e.category === "promotions").length;
   const newsletterCount = emails.filter((e) => e.is_newsletter).length;
-  const senderCount = new Set(emails.map((e) => e.sender_email)).size;
+  const senderCount = new Set(emails.map((e) => e.sender_email)).size; 
 
   return (
     <div className="min-h-screen flex bg-gray-50 text-gray-800 overflow-x-hidden">
       {/* -------- SIDEBAR -------- */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
 
         {/* ----- LOGO -----*/}
         <div className="px-6 py-5 flex items-center ">
-          <span className="font-bold text-3xl tracking-tight">unclutter<span className="text-blue-600">.</span></span>
+          <span className="font-bold text-2xl tracking-tight">unclutter<span className="text-blue-600">.</span></span>
         </div>
 
         <nav className="px-3 mt-2 space-y-1">
           {/* group 1 - clean */}
           <div>
-            <p className="px-3 mb-2 text-xs font-semibold tracking-wider text-gray-400 uppercase">
+            <p className="px-3 mb-2 text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
               Clean
             </p>
 
             <div className="space-y-1">
-              <a className="flex items-center justify-between px-3 py-2 rounded-lg bg-blue-600 text-white font-medium">
+              <a className="flex text-sm items-center justify-between px-3 py-2 rounded-lg bg-blue-600 text-white font-medium">
                 <span>Dashboard</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-green-400 text-green-900 font-semibold">new</span>
               </a>
-              <a className="flex items-center justify-between px-3 py-2 rounded-lg text-red-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <a className="flex text-sm  items-center justify-between px-3 py-2 rounded-lg text-red-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
                 <span>Bulk Delete</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">2,847</span>
               </a>
-              <a className="flex items-center justify-between px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <a className="flex text-sm items-center justify-between px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
                 <span>Unsubscribe</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">24</span>
               </a>
-              <a className="flex items-center px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <a className="flex text-sm items-center px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
                 Archive
               </a>
             </div>
@@ -148,15 +152,15 @@ function Dashboard({ emails }) {
 
           {/* group 2 - analyse */}
           <div>
-            <p className="px-3 mb-2 text-xs font-semibold tracking-wider text-gray-400 uppercase">
+            <p className="px-3 mt-8 mb-2 text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
               Analyse
             </p>
 
             <div className="space-y-1">
-              <a className="flex items-center px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <a className="flex items-center text-sm px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
                 Inbox Stats
               </a>
-              <a className="flex items-center px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <a className="flex items-center text-sm px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
                 Top Senders
               </a>
             </div>
@@ -192,7 +196,7 @@ function Dashboard({ emails }) {
                 ✓
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-l font-bold text-gray-900">
                   Hey there! — you've got {unreadCount} unread emails
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
@@ -212,10 +216,10 @@ function Dashboard({ emails }) {
 
           {/* 4 STAT CARDS */}
           <div className="grid grid-cols-4 gap-4 mb-6">
-            <StatCard value={unreadCount} label="unread emails" color="text-green-500" />
-            <StatCard value={newsletterCount} label="newsletters" color="text-blue-500" />
-            <StatCard value={senderCount} label="senders" color="text-yellow-500" />
-            <StatCard value={emails.length} label="total emails" color="text-red-500" />
+            <StatCard value={unreadCount} label="unread emails" color="text-green-500" icon={unreadIcon}/>
+            <StatCard value={newsletterCount} label="newsletters" color="text-blue-500" icon={newsletterIcon} />
+            <StatCard value={promotionsCount} label="promotions" color="text-yellow-500" icon={promotionIcon}/>
+            <StatCard value={emails.length} label="total emails" color="text-red-500" icon={totalIcon}/>
           </div>
 
           {/* TWO COLUMN: email list (left) + panels (right) */}
@@ -228,7 +232,7 @@ function Dashboard({ emails }) {
                 <span className="text-sm text-gray-500">{emails.length} total</span>
               </div>
 
-              <div>
+              <div className="max-h-96 overflow-y-auto">
                 {emails.map((email) => (
                   <div
                     key={email.id}
@@ -258,7 +262,7 @@ function Dashboard({ emails }) {
             <div className="space-y-4">
 
               {/* panel 1 — by category */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5  min-h-48">
                 <h3 className="font-semibold text-gray-900 mb-4">By category</h3>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
@@ -277,7 +281,7 @@ function Dashboard({ emails }) {
               </div>
 
               {/* panel 2 — unsubscribe */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5 min-h-72">
                 <h3 className="font-semibold text-gray-900 mb-4">Unsubscribe</h3>
                 <div className="space-y-3 text-sm">
                   <p className="text-gray-500">Newsletter senders will appear here.</p>
@@ -292,16 +296,13 @@ function Dashboard({ emails }) {
   );
 }
 
-// ============================================================
-//  StatCard — small reusable card
-// ============================================================
-function StatCard({ value, label, color }) {
+function StatCard({ value, label, color, icon }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 px-5 py-10">
-      <div className={`text-5xl font-bold ${color}`}>{value}</div>
+    <div className="bg-white rounded-xl border border-gray-200 px-5 py-4">
+      {icon && <img src={icon} alt={label} className="w-6 h-6 mb-4" />}
+      <div className={`text-4xl font-bold ${color}`}>{value}</div>
       <div className="text-sm text-gray-600 mt-1">{label}</div>
     </div>
   );
 }
-
 export default App;

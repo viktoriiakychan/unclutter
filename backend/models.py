@@ -9,8 +9,10 @@ class Email:
     subject: str
     date: str
     unread: bool
+    category: str
     attachment_count: int
     attachment_size: int
-    is_newsletter: bool     
+    is_newsletter: bool    
+    category: str
     unsubscribe: str = ""
     internal_date: int = 0

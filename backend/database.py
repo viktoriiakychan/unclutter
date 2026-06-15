@@ -19,6 +19,7 @@ def create_table():
             subject TEXT,
             date TEXT,
             unread INTEGER,
+            category TEXT,
             attachment_count INTEGER,
             attachment_size INTEGER,
             is_newsletter INTEGER,
@@ -43,8 +44,8 @@ def save_emails(emails):
         cursor.execute("""
            INSERT OR REPLACE INTO emails
             (id, thread_id, sender_name, sender_email, subject, date,
-             unread, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             email.id,
             email.thread_id,
@@ -53,6 +54,7 @@ def save_emails(emails):
             email.subject,
             email.date,
             1 if email.unread else 0,
+            email.category,
             email.attachment_count,
             email.attachment_size,
             1 if email.is_newsletter else 0,
@@ -83,11 +85,12 @@ def load_emails():
             subject=row[4],
             date=row[5],
             unread=bool(row[6]),            # 1/0 back to True/False
-            attachment_count=row[7],
-            attachment_size=row[8],
-            is_newsletter=bool(row[9]),     # 1/0 back to True/False
-            unsubscribe=row[10],
-            internal_date=row[11]
+            category=row[7],            # 1/0 back to True/False
+            attachment_count=row[8],
+            attachment_size=row[9],
+            is_newsletter=bool(row[10]),     # 1/0 back to True/False
+            unsubscribe=row[11],
+            internal_date=row[12]
         )
         emails.append(email)
 
