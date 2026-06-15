@@ -14,6 +14,7 @@ function App() {
   const [phase, setPhase] = useState("checking");
   const [emails, setEmails] = useState([]);
 
+
   useEffect(() => {
     checkLogin();
   }, []);
@@ -89,13 +90,10 @@ function App() {
     );
   }
 
-  // phase === "ready" → show the real dashboard
   return <Dashboard emails={emails} />;
 }
 
-// ============================================================
-//  CenterMessage — tiny helper for the loading/checking screens
-// ============================================================
+
 function CenterMessage({ text }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
@@ -104,15 +102,56 @@ function CenterMessage({ text }) {
   );
 }
 
-// ============================================================
-//  DASHBOARD — your full UI. Receives emails as a prop.
-// ============================================================
 function Dashboard({ emails }) {
   // stats computed from the real data
   const unreadCount = emails.filter((e) => e.unread).length;
   const promotionsCount = emails.filter((e) => e.category === "promotions").length;
   const newsletterCount = emails.filter((e) => e.is_newsletter).length;
   const senderCount = new Set(emails.map((e) => e.sender_email)).size; 
+
+  const [activeFilter, setActiveFilter] = useState("All");
+  const filters = ["All", "Newsletter", "Promotions", "Updates", "Older than 30 days"];
+
+  const filterColors = {
+    "All": "bg-green-50 text-green-500 border-green-300",
+    "Newsletter": "bg-blue-50 text-blue-500 border-blue-300",
+    "Promotions": "bg-yellow-50 text-yellow-600 border-yellow-300",
+    "Updates": "bg-orange-50 text-orange-500 border-orange-300",
+    "Older than 30 days": "bg-gray-100 text-gray-600 border-gray-400",
+  };
+
+  const filterHovers = {
+    "All": "hover:bg-green-50 hover:text-green-600 hover:border-green-200",
+    "Newsletter": "hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200",
+    "Promotions": "hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-200",
+    "Updates": "hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200",
+    "Older than 30 days": "hover:bg-gray-100 hover:text-gray-800 hover:border-gray-400",
+  };
+
+  const filteredEmails = emails.filter((email) => {
+    if (activeFilter === "All") return true;
+    if (activeFilter === "Newsletter") return email.is_newsletter;
+    if (activeFilter === "Promotions") return email.category === "promotions" && !email.is_newsletter;
+    if (activeFilter === "Updates") return email.category === "updates" && !email.is_newsletter;
+    if (activeFilter === "Older than 30 days") {
+      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      return Number(email.internal_date) < thirtyDaysAgo;
+    }
+    return true;
+  });
+
+  function timeAgo(internalDate) {
+    const ageMs = Date.now() - Number(internalDate);
+    const mins = Math.floor(ageMs / (60 * 1000));
+    const hours = Math.floor(ageMs / (60 * 60 * 1000));
+    const days = Math.floor(ageMs / (24 * 60 * 60 * 1000));
+    const weeks = Math.floor(ageMs / (7* 24 * 60 * 60 * 1000));
+
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return `${weeks}w ago`;
+  }
 
   return (
     <div className="min-h-screen flex bg-gray-50 text-gray-800 overflow-x-hidden">
@@ -232,29 +271,78 @@ function Dashboard({ emails }) {
                 <span className="text-sm text-gray-500">{emails.length} total</span>
               </div>
 
-              <div className="max-h-96 overflow-y-auto">
-                {emails.map((email) => (
-                  <div
-                    key={email.id}
-                    className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
+              <div className="flex items-center justify-between px-5 py-2 border-b border-gray-200">
+                {filters.map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setActiveFilter(filter)}
+                    className={`text-[10px] px-4 py-0.5 rounded-full font-medium flex-shrink-0 border ${
+                      activeFilter === filter
+                        ? filterColors[filter] // if match it gets the colour
+                        : `text-gray-700 border-gray-500 ${filterHovers[filter]}` // if not match go grey 
+                    }`}
                   >
-                    <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
-                      {email.sender_name ? email.sender_name[0].toUpperCase() : "?"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs text-gray-500 truncate">{email.sender_email}</div>
-                      <div className="text-sm font-medium text-gray-900 truncate">{email.subject}</div>
-                    </div>
-                    {email.is_newsletter && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium flex-shrink-0">
-                        newsletter
-                      </span>
-                    )}
-                    {email.unread && (
-                      <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></span>
-                    )}
-                  </div>
+                    {filter}
+                  </button>
                 ))}
+                <input
+                  type="text"
+                  placeholder="Search by sender"
+                  className="px-3 py-1 rounded-lg bg-gray-100 text-sm max-w-40 max-h-6 outline-none text-[10px]"
+                />
+              </div>
+
+              <div className="max-h-96 overflow-y-auto">
+                {filteredEmails.map((email) => {
+
+                  
+                  
+                  return (
+                    <div
+                      key={email.id}
+                      className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          email.unread ? "bg-blue-500" : "bg-transparent"
+                        }`}
+                      ></span>
+
+                      <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
+                        {email.sender_name ? email.sender_name[0].toUpperCase() : "?"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        
+                        <div className="text-xs text-gray-400 truncate">{email.sender_email}</div>
+                        {email.unread ? (
+                            <div className="text-sm font-medium text-gray truncate">{email.subject}</div>
+                          ) : (
+                            <div className="text-sm font-normal text-gray truncate">{email.subject}</div>
+                          )}
+                      </div>
+                      
+                      {email.is_newsletter ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium flex-shrink-0">
+                          newsletter
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                            email.category === "promotions" ? "bg-yellow-100 text-yellow-700" :
+                            email.category === "social"     ? "bg-purple-100 text-purple-700" :
+                            email.category === "updates"    ? "bg-orange-100 text-orange-700" :
+                            "bg-gray-100 text-gray-700"
+                          }`}> 
+                            {email.category}
+                        </span>
+                      )}
+
+                      <span className="text-[10px] py-0.5 font-small text-gray-400 flex-shrink-0">
+                          {timeAgo(email.internal_date)}
+                        </span>
+                      
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
