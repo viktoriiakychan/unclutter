@@ -40,11 +40,13 @@ def sync():
     if not client.check_if_logged_in():
         return jsonify({"error": "not_logged_in"}), 401
     client.connect()
-    emails = client.get_emails()
+
+    existing = database.get_existing_ids()        # what we already have
+    new_emails = client.get_new_emails(existing)   # only fetch new ones
+
     database.create_table()
-    database.clear_emails()
-    database.save_emails(emails)
-    return jsonify({"synced": len(emails)})
+    database.save_emails(new_emails)               # INSERT OR REPLACE adds them
+    return jsonify({"synced": len(new_emails)})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

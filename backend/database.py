@@ -68,7 +68,7 @@ def load_emails():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM emails")
+    cursor.execute("SELECT * FROM emails ORDER BY internal_date DESC")
     rows = cursor.fetchall()
 
     conn.close()
@@ -101,3 +101,12 @@ def clear_emails():
     cursor.execute("DELETE FROM emails")
     conn.commit()
     conn.close()
+
+def get_existing_ids():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id from emails")
+    rows = cursor.fetchall()
+    conn.close()
+
+    return {row[0] for row in rows} # a set of ids 

@@ -96,17 +96,15 @@ class GmailClient:
         return count, total_size
 
     def get_emails(self, limit=100):
-
         results = self.service.users().messages().list(
             userId="me",
             maxResults=limit
         ).execute()
+        messages = results.get("messages", [])
+        return self._fetch_full(messages)   # ← delegate to shared method
 
-        messages = results.get(
-            "messages",
-            []
-        )
 
+    def _fetch_full(self, messages):
         full_messages = {}
 
         def handle_response(request_id, response, exception):
@@ -133,7 +131,7 @@ class GmailClient:
                     request_id= message["id"]
                 )
             batch.execute()
-            time.sleep(1.0)
+            time.sleep(0.2)
 
         emails = []
 
@@ -263,3 +261,27 @@ class GmailClient:
             ).execute()
 
         print(f"Moved {len(email_ids)} emails to Trash.")
+
+    def get_profile(self):
+        profile = self.service.users().getProfile(userId="me").execute()
+
+        return{
+            "email": profile.get("emailAddress")
+        }
+
+    def get_new_emails(self, existing_ids, limit=100):
+        # 1 get the recent message ids
+        results = self.service.users().messages().list(
+            userId="me",
+            maxResults=limit
+        ).execute()
+        messages = results.get("messages", [])
+
+        # 2 keep only ids we dont already have 
+        new_messages = [m for m in messages if m["id"] not in existing_ids]
+
+        if not new_messages:
+            return []
+
+        return self._fetch_full(new_messages)
+        

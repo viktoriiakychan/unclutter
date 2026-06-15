@@ -15,6 +15,17 @@ function App() {
     checkLogin();
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch(`${API}/sync`, { method: "POST" })
+        .then(() => fetch(`${API}/emails`))
+        .then((r) => r.json())
+        .then((fresh) => setEmails(fresh));
+    }, 30000);  // every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
   async function checkLogin() {
     setPhase("checking");
     const res = await fetch(`${API}/auth/status`);
@@ -35,10 +46,16 @@ function App() {
 
   async function loadEverything() {
     setPhase("loading");
-    await fetch(`${API}/sync`, { method: "POST" }); // fetch fresh from Gmail
+    // 1. show db data immediately
     const res = await fetch(`${API}/emails`);
     setEmails(await res.json());
-    setPhase("ready");
+    setPhase("ready"); // dashboard shows nowfrom db
+
+    // 2. sync in the background 
+    fetch(`${API}/sync`, { method: "POST" })
+    .then(() => fetch(`${API}/emails`))
+    .then((r) => r.json())
+    .then((fresh) => setEmails(fresh)); 
   }
 
   // ---- what to show, based on phase ----
@@ -176,7 +193,7 @@ function Dashboard({ emails }) {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
-                  Hey Viktoriia 👋 — you've got {unreadCount} unread emails
+                  Hey there! — you've got {unreadCount} unread emails
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
                   We've tidied through your inbox. Ready when you are.
