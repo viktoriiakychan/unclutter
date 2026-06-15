@@ -17,34 +17,55 @@ class GmailClient:
     ]
 
     def __init__(self):
+        self.creds = None
+        self.service = None
 
-        creds = None
+    def connect(self):
+        # buil the gmail service from a valid token. call after login exists
 
-        if os.path.exists("token.json"):
-            creds = Credentials.from_authorized_user_file(
-                "token.json",
-                self.SCOPES
-            )
-
-        if not creds or not creds.valid:
-
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    "backend/credentials.json",
-                    self.SCOPES
-                )
-                creds = flow.run_local_server(port=0)
-
+        creds = Credentials.from_authorized_user_file("token.json", self.SCOPES)
+        if creds.expired and creds.refresh_token:
+            creds.refresh(Request())
             with open("token.json", "w") as f:
                 f.write(creds.to_json())
-
+        self.creds = creds
         self.service = build(
-            "gmail",
-            "v1",
-            credentials=creds
-        )
+            "gmail", 
+            "v1", 
+            credentials=creds)    
+
+    def check_if_logged_in(self):
+        # is there a valid login right now ?
+        if not os.path.exists("token.json"):
+            return False
+
+        creds = Credentials.from_authorized_user_file("token.json", self.SCOPES)
+
+        # if token is valid - logged in    
+        if creds.valid:
+            return True
+
+        # if token expired byt refreshable
+        if creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                with open("token.json", "w") as f:
+                    f.write(creds.to_json())
+                return True
+            except Exception:
+                return False
+
+        # no token or expired with no refresh token        
+        return False        
+
+    def start_login(self):
+        flow = InstalledAppFlow.from_client_secrets_file("credentials.json", self.SCOPES)
+        creds = flow.run_local_server(port=0)
+
+        with open("token.json", "w") as f:
+            f.write(creds.to_json())
+        
+        return creds
 
     def attachment_stats(self, parts):
         count = 0
@@ -103,7 +124,7 @@ class GmailClient:
                 callback=handle_response
             )
 
-            for message in messages:
+            for message in chunk:
                 batch.add(
                     self.service.users().messages().get(
                         userId="me",

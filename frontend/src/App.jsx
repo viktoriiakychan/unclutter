@@ -1,27 +1,103 @@
 import { useState, useEffect } from "react";
 
-function App() {
-  const [emails, setEmails] = useState([]);
-  const [dark, setDark] = useState(false);
+const API = "http://localhost:5000";
 
+// ============================================================
+//  APP — the login gate. Decides what to show on page load.
+// ============================================================
+function App() {
+  // checking → loading → loggedOut → ready
+  const [phase, setPhase] = useState("checking");
+  const [emails, setEmails] = useState([]);
+
+  // runs once, the moment the page opens
   useEffect(() => {
-    fetch("http://localhost:5000/emails")
-      .then((res) => res.json())
-      .then((data) => setEmails(data));
+    checkLogin();
   }, []);
 
-  // simple stats from your real data
+  async function checkLogin() {
+    setPhase("checking");
+    const res = await fetch(`${API}/auth/status`);
+    const { logged_in } = await res.json(); // true or false
+
+    if (logged_in) {
+      await loadEverything();
+    } else {
+      setPhase("loggedOut");
+    }
+  }
+
+  async function handleLogin() {
+    setPhase("loading");
+    await fetch(`${API}/auth/login`, { method: "POST" }); // Google popup
+    await loadEverything();
+  }
+
+  async function loadEverything() {
+    setPhase("loading");
+    await fetch(`${API}/sync`, { method: "POST" }); // fetch fresh from Gmail
+    const res = await fetch(`${API}/emails`);
+    setEmails(await res.json());
+    setPhase("ready");
+  }
+
+  // ---- what to show, based on phase ----
+  if (phase === "checking") {
+    return <CenterMessage text="Checking login..." />;
+  }
+
+  if (phase === "loading") {
+    return <CenterMessage text="Loading your inbox..." />;
+  }
+
+  if (phase === "loggedOut") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+          <span className="font-bold text-3xl tracking-tight">
+            unclutter<span className="text-blue-600">.</span>
+          </span>
+          <p className="text-gray-500 mt-4 mb-6">Sign in to load your inbox.</p>
+          <button
+            onClick={handleLogin}
+            className="px-5 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
+          >
+            Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // phase === "ready" → show the real dashboard
+  return <Dashboard emails={emails} />;
+}
+
+// ============================================================
+//  CenterMessage — tiny helper for the loading/checking screens
+// ============================================================
+function CenterMessage({ text }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
+      {text}
+    </div>
+  );
+}
+
+// ============================================================
+//  DASHBOARD — your full UI. Receives emails as a prop.
+// ============================================================
+function Dashboard({ emails }) {
+  // stats computed from the real data
   const unreadCount = emails.filter((e) => e.unread).length;
   const newsletterCount = emails.filter((e) => e.is_newsletter).length;
   const senderCount = new Set(emails.map((e) => e.sender_email)).size;
-
-
 
   return (
     <div className="min-h-screen flex bg-gray-50 text-gray-800 overflow-x-hidden">
       {/* -------- SIDEBAR -------- */}
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        
+
         {/* ----- LOGO -----*/}
         <div className="px-6 py-5 flex items-center ">
           <span className="font-bold text-3xl tracking-tight">unclutter<span className="text-blue-600">.</span></span>
@@ -32,9 +108,8 @@ function App() {
           <div>
             <p className="px-3 mb-2 text-xs font-semibold tracking-wider text-gray-400 uppercase">
               Clean
-            </p> 
-              
-            
+            </p>
+
             <div className="space-y-1">
               <a className="flex items-center justify-between px-3 py-2 rounded-lg bg-blue-600 text-white font-medium">
                 <span>Dashboard</span>
@@ -83,11 +158,11 @@ function App() {
             placeholder="Search..."
             className="px-3 py-2 rounded-lg bg-gray-100 text-sm w-72 outline-none"
           />
-          
+
           <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">
             Sign In
           </button>
-          
+
         </header>
 
         {/* MAIN CONTENT */}
@@ -126,83 +201,83 @@ function App() {
             <StatCard value={emails.length} label="total emails" color="text-red-500" />
           </div>
 
-         {/* TWO COLUMN: email list (left) + panels (right) */}
-<div className="grid grid-cols-3 gap-6">
+          {/* TWO COLUMN: email list (left) + panels (right) */}
+          <div className="grid grid-cols-3 gap-6">
 
-  {/* LEFT — email list */}
-{/* LEFT */}
-<div className="col-span-2 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-      <h2 className="font-semibold text-gray-900">My Emails</h2>
-      <span className="text-sm text-gray-500">{emails.length} total</span>
-    </div>
+            {/* LEFT — email list */}
+            <div className="col-span-2 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+                <h2 className="font-semibold text-gray-900">My Emails</h2>
+                <span className="text-sm text-gray-500">{emails.length} total</span>
+              </div>
 
-    <div>
-      {emails.map((email) => (
-        <div
-          key={email.id}
-          className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
-        >
-          <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
-            {email.sender_name ? email.sender_name[0].toUpperCase() : "?"}
+              <div>
+                {emails.map((email) => (
+                  <div
+                    key={email.id}
+                    className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
+                      {email.sender_name ? email.sender_name[0].toUpperCase() : "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-gray-500 truncate">{email.sender_email}</div>
+                      <div className="text-sm font-medium text-gray-900 truncate">{email.subject}</div>
+                    </div>
+                    {email.is_newsletter && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium flex-shrink-0">
+                        newsletter
+                      </span>
+                    )}
+                    {email.unread && (
+                      <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* RIGHT — two stacked panels */}
+            <div className="space-y-4">
+
+              {/* panel 1 — by category */}
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="font-semibold text-gray-900 mb-4">By category</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Newsletters</span>
+                    <span className="font-medium text-gray-900">{newsletterCount}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Unread</span>
+                    <span className="font-medium text-gray-900">{unreadCount}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Senders</span>
+                    <span className="font-medium text-gray-900">{senderCount}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* panel 2 — unsubscribe */}
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="font-semibold text-gray-900 mb-4">Unsubscribe</h3>
+                <div className="space-y-3 text-sm">
+                  <p className="text-gray-500">Newsletter senders will appear here.</p>
+                </div>
+              </div>
+
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs text-gray-500 truncate">{email.sender_email}</div>
-            <div className="text-sm font-medium text-gray-900 truncate">{email.subject}</div>
-          </div>
-          {email.is_newsletter && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium flex-shrink-0">
-              newsletter
-            </span>
-          )}
-          {email.unread && (
-            <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></span>
-          )}
-        </div>
-      ))}
-    </div>
-  </div>
-
-  {/* RIGHT — two stacked panels */}
-  {/* RIGHT */}
-<div className="space-y-4">
-
-    {/* panel 1 — by category */}
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <h3 className="font-semibold text-gray-900 mb-4">By category</h3>
-      <div className="space-y-3 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Newsletters</span>
-          <span className="font-medium text-gray-900">{newsletterCount}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Unread</span>
-          <span className="font-medium text-gray-900">{unreadCount}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Senders</span>
-          <span className="font-medium text-gray-900">{senderCount}</span>
-        </div>
-      </div>
-    </div>
-
-    {/* panel 2 — unsubscribe */}
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <h3 className="font-semibold text-gray-900 mb-4">Unsubscribe</h3>
-      <div className="space-y-3 text-sm">
-        <p className="text-gray-500">Newsletter senders will appear here.</p>
-      </div>
-    </div>
-
-  </div>
-</div>
         </main>
       </div>
     </div>
   );
 }
 
-// small reusable card component
+// ============================================================
+//  StatCard — small reusable card
+// ============================================================
 function StatCard({ value, label, color }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 px-5 py-10">
