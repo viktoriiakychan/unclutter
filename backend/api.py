@@ -52,5 +52,14 @@ def sync():
     database.save_emails(emails)        # ← fixed: emails, not new_emails
     return jsonify({"synced": len(emails)})
 
+@app.route("/auth/me")
+def get_logged_in_user():
+    
+    client = GmailClient()
+    client.connect()
+
+    profile = client.get_profile()
+    return profile
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

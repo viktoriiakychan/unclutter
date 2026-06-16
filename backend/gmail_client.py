@@ -264,9 +264,7 @@ class GmailClient:
     def get_profile(self):
         profile = self.service.users().getProfile(userId="me").execute()
 
-        return{
-            "email": profile.get("emailAddress")
-        }
+        return {"email": profile["emailAddress"]}
 
     def get_new_emails(self, existing_ids, limit=100):
         # get the recent message IDS!!! 

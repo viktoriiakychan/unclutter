@@ -3,6 +3,8 @@ import unreadIcon from "./assets/unread-message.png";
 import newsletterIcon from "./assets/newspaper.png";
 import promotionIcon from "./assets/promotions.png";
 import totalIcon from "./assets/email.png";
+import searchIcon from "./assets/search.png";
+import clearIcon from "./assets/close.png";
 
 const API = "http://localhost:5000";
 
@@ -13,7 +15,6 @@ function App() {
   // checking → loading → loggedOut → ready
   const [phase, setPhase] = useState("checking");
   const [emails, setEmails] = useState([]);
-
 
   useEffect(() => {
     checkLogin();
@@ -110,33 +111,67 @@ function Dashboard({ emails }) {
   const senderCount = new Set(emails.map((e) => e.sender_email)).size; 
 
   const [activeFilter, setActiveFilter] = useState("All");
-  const filters = ["All", "Newsletter", "Promotions", "Updates", "Older than 30 days"];
+  const filters = ["All", "Unread", "Newsletter", "Promotions", "Updates", "Older than 30 days"];
+
+  const [senderSearch, setSenderSearch] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+
+  useEffect(()=> {
+    fetch(`${API}/auth/me`)
+      .then((r) => r.json())
+      .then((data) => setUserEmail(data.email));
+  }, []);
+
+  console.log(userEmail);
 
   const filterColors = {
     "All": "bg-green-50 text-green-500 border-green-300",
-    "Newsletter": "bg-blue-50 text-blue-500 border-blue-300",
+    "Unread": "bg-blue-50 text-blue-500 border-blue-300",
+    "Newsletter": "bg-orange-50 text-orange-500 border-orange-300",
     "Promotions": "bg-yellow-50 text-yellow-600 border-yellow-300",
-    "Updates": "bg-orange-50 text-orange-500 border-orange-300",
+    "Updates": "bg-purple-50 text-purple-500 border-purple-300",
     "Older than 30 days": "bg-gray-100 text-gray-600 border-gray-400",
   };
 
   const filterHovers = {
     "All": "hover:bg-green-50 hover:text-green-600 hover:border-green-200",
-    "Newsletter": "hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200",
+    "Unread": "hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200",
+    "Newsletter": "hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200",
     "Promotions": "hover:bg-yellow-50 hover:text-yellow-700 hover:border-yellow-200",
-    "Updates": "hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200",
+    "Updates": "hover:bg-purple-50 hover:text-purple-600 hover:border-purple-200",
     "Older than 30 days": "hover:bg-gray-100 hover:text-gray-800 hover:border-gray-400",
   };
 
   const filteredEmails = emails.filter((email) => {
-    if (activeFilter === "All") return true;
-    if (activeFilter === "Newsletter") return email.is_newsletter;
-    if (activeFilter === "Promotions") return email.category === "promotions" && !email.is_newsletter;
-    if (activeFilter === "Updates") return email.category === "updates" && !email.is_newsletter;
-    if (activeFilter === "Older than 30 days") {
+    let matchesFilter = true;
+
+    //if (activeFilter === "All") return true;
+
+    if (activeFilter === "Unread") {
+      matchesFilter = email.unread;
+    } 
+    else if (activeFilter === "Newsletter") {
+      matchesFilter = email.is_newsletter;
+    } 
+    else if (activeFilter === "Promotions") {
+      matchesFilter = email.category === "promotions" && !email.is_newsletter;
+    } 
+    else if (activeFilter === "Updates") {
+      matchesFilter = email.category === "updates" && !email.is_newsletter;
+    } 
+    else if (activeFilter === "Older than 30 days") {
       const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      return Number(email.internal_date) < thirtyDaysAgo;
+      matchesFilter = Number(email.internal_date) < thirtyDaysAgo;
     }
+
+    const search = senderSearch.toLowerCase();
+    const matchesSearch =
+      (email.sender_name || "").toLowerCase().includes(search) ||
+      (email.subject || "").toLowerCase().includes(search) ||
+      (email.sender_email || "").toLowerCase().includes(search);
+
+    return matchesFilter && matchesSearch;
+
     return true;
   });
 
@@ -213,11 +248,12 @@ function Dashboard({ emails }) {
       <div className="flex-1 flex flex-col">
         {/* TOP BAR */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-          <input
-            type="text"
-            placeholder="Search..."
-            className="px-3 py-2 rounded-lg bg-gray-100 text-sm w-72 outline-none"
-          />
+         <div className="flex items-center gap-2 rounded-4xl border-blue-200 border px-4 py-1">
+            <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 text-xs bg-gradient-to-l from-blue-50 to-blue-200 flex items-center justify-center font-semibold flex-shrink-0">
+              {userEmail ? userEmail[0].toUpperCase() : "?"}
+            </div>
+            <span className="text-blue-700 font-semibold text-xs">{userEmail}</span>
+          </div>
 
           <button className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">
             Sign In
@@ -276,7 +312,7 @@ function Dashboard({ emails }) {
                   <button
                     key={filter}
                     onClick={() => setActiveFilter(filter)}
-                    className={`text-[10px] px-4 py-0.5 rounded-full font-medium flex-shrink-0 border ${
+                    className={`text-[10px] px-3 py-0.5 rounded-full font-medium flex-shrink-0 border ${
                       activeFilter === filter
                         ? filterColors[filter] // if match it gets the colour
                         : `text-gray-700 border-gray-500 ${filterHovers[filter]}` // if not match go grey 
@@ -285,18 +321,34 @@ function Dashboard({ emails }) {
                     {filter}
                   </button>
                 ))}
+                <div className="relative max-w-40">
+
                 <input
                   type="text"
+                  value={senderSearch}
+                  onChange={(e) => setSenderSearch(e.target.value)}
                   placeholder="Search by sender"
-                  className="px-3 py-1 rounded-lg bg-gray-100 text-sm max-w-40 max-h-6 outline-none text-[10px]"
-                />
+                  className="px-2 py-1 text-sm max-w-40 max-h-6 outline-none text-[10px] text-gray-500 border-b border-gray-400 focus:border-blue-400"
+                  />
+                  {senderSearch ? (
+                      <img
+                      src={clearIcon}
+                      alt="search"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
+                    />
+                  ):
+                  (
+                    <img
+                      src={searchIcon}
+                      alt="search"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
+                      />
+                  )}
+                </div>
               </div>
 
               <div className="max-h-96 overflow-y-auto">
                 {filteredEmails.map((email) => {
-
-                  
-                  
                   return (
                     <div
                       key={email.id}
@@ -313,7 +365,7 @@ function Dashboard({ emails }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         
-                        <div className="text-xs text-gray-400 truncate">{email.sender_email}</div>
+                        <div className="text-xs text-gray-400 truncate">{email.sender_name}</div>
                         {email.unread ? (
                             <div className="text-sm font-medium text-gray truncate">{email.subject}</div>
                           ) : (
@@ -322,14 +374,14 @@ function Dashboard({ emails }) {
                       </div>
                       
                       {email.is_newsletter ? (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium flex-shrink-0">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium flex-shrink-0">
                           newsletter
                         </span>
                       ) : (
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
                             email.category === "promotions" ? "bg-yellow-100 text-yellow-700" :
                             email.category === "social"     ? "bg-purple-100 text-purple-700" :
-                            email.category === "updates"    ? "bg-orange-100 text-orange-700" :
+                            email.category === "updates"    ? "bg-purple-100 text-purple-700" :
                             "bg-gray-100 text-gray-700"
                           }`}> 
                             {email.category}
