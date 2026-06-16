@@ -113,6 +113,14 @@ function Dashboard({ emails }) {
   const [activeFilter, setActiveFilter] = useState("All");
   const filters = ["All", "Unread", "Newsletter", "Promotions", "Updates", "Older than 30 days"];
 
+  const categories = [
+    { name: "Newsletter", text_color: "text-orange-500", style: "bg-orange-400 text-orange-500 border-orange-300" },
+    { name: "Promotions", text_color: "text-yellow-500", style: "bg-yellow-400 text-yellow-500 border-yellow-300" },
+    { name: "Updates", text_color: "text-green-500", style: "bg-green-400 text-green-500 border-green-300" },
+    { name: "Social", text_color: "text-purple-500", style: "bg-purple-400 text-purple-500 border-purple-300" },
+    { name: "Other", text_color: "text-gray-500", style: "bg-gray-400 text-gray-500 border-gray-300" },
+  ];
+
   const [senderSearch, setSenderSearch] = useState("");
   const [userEmail, setUserEmail] = useState("");
 
@@ -145,8 +153,6 @@ function Dashboard({ emails }) {
   const filteredEmails = emails.filter((email) => {
     let matchesFilter = true;
 
-    //if (activeFilter === "All") return true;
-
     if (activeFilter === "Unread") {
       matchesFilter = email.unread;
     } 
@@ -174,6 +180,20 @@ function Dashboard({ emails }) {
 
     return true;
   });
+
+  function getCount(category)
+  {
+    if(category === "Newsletter")
+    {
+      return newsletterCount;
+    }
+    return emails.filter((email) => email.category === category.toLowerCase() && !email.is_newsletter).length;
+  }
+
+  function getPercentage(categoryCount, category)
+  {
+      return ((categoryCount / emails.length) * 100).toFixed(0);
+  }
 
   function timeAgo(internalDate) {
     const ageMs = Date.now() - Number(internalDate);
@@ -381,7 +401,7 @@ function Dashboard({ emails }) {
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
                             email.category === "promotions" ? "bg-yellow-100 text-yellow-700" :
                             email.category === "social"     ? "bg-purple-100 text-purple-700" :
-                            email.category === "updates"    ? "bg-purple-100 text-purple-700" :
+                            email.category === "updates"    ? "bg-green-100 text-green-700" :
                             "bg-gray-100 text-gray-700"
                           }`}> 
                             {email.category}
@@ -404,20 +424,20 @@ function Dashboard({ emails }) {
               {/* panel 1 — by category */}
               <div className="bg-white rounded-xl border border-gray-200 p-5  min-h-48">
                 <h3 className="font-semibold text-gray-900 mb-4">By category</h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Newsletters</span>
-                    <span className="font-medium text-gray-900">{newsletterCount}</span>
+
+                {categories.map((category) => (
+                  <div className="flex items-center gap-3 py-1" key={category.name}>
+                    <span className="w-20 text-xs text-gray-500 flex-shrink-0">{category.name}</span>
+                    <div className="flex-1 h-2 rounded-full bg-gray-100">
+                      <div className={`h-2 rounded-full min-w-[8px] ${category.style}`}
+                          style={{ width: `${getPercentage(getCount(category.name), category.name)}%` }}></div>
+                    </div>
+                    <span className="w-8 text-right text-xs text-gray-400 flex-shrink-0">{getCount(category.name)}</span>
+                    <span className={`w-10 text-right text-xs font-semibold ${category.text_color} flex-shrink-0`}>{getPercentage(getCount(category.name), category.name)}%</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Unread</span>
-                    <span className="font-medium text-gray-900">{unreadCount}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Senders</span>
-                    <span className="font-medium text-gray-900">{senderCount}</span>
-                  </div>
-                </div>
+                ))}
+                
+                  
               </div>
 
               {/* panel 2 — unsubscribe */}
