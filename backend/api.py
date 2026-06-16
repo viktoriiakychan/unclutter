@@ -54,12 +54,19 @@ def sync():
 
 @app.route("/auth/me")
 def get_logged_in_user():
-    
+
     client = GmailClient()
     client.connect()
 
     profile = client.get_profile()
     return profile
+
+@app.route("/unsubscribe-list")
+def unsubscribe_list():
+    client = GmailClient()
+    client.connect()
+
+    return client.get_unsubscribe_links()    
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

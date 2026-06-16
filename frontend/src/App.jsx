@@ -123,11 +123,18 @@ function Dashboard({ emails }) {
 
   const [senderSearch, setSenderSearch] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [unsubscribeList, setUnsubscribeList] = useState([]);
 
   useEffect(()=> {
     fetch(`${API}/auth/me`)
       .then((r) => r.json())
       .then((data) => setUserEmail(data.email));
+  }, []);
+
+  useEffect(()=> {
+    fetch(`${API}/unsubscribe-list`)
+      .then((r) => r.json())
+      .then((data) => setUnsubscribeList(data));
   }, []);
 
   console.log(userEmail);
@@ -427,7 +434,7 @@ function Dashboard({ emails }) {
 
                 {categories.map((category) => (
                   <div className="flex items-center gap-3 py-1" key={category.name}>
-                    <span className="w-20 text-xs text-gray-500 flex-shrink-0">{category.name}</span>
+                    <span className="w-20 text-[12px] text-gray-500 flex-shrink-0">{category.name}</span>
                     <div className="flex-1 h-2 rounded-full bg-gray-100">
                       <div className={`h-2 rounded-full min-w-[8px] ${category.style}`}
                           style={{ width: `${getPercentage(getCount(category.name), category.name)}%` }}></div>
@@ -444,7 +451,28 @@ function Dashboard({ emails }) {
               <div className="bg-white rounded-xl border border-gray-200 p-5 min-h-72">
                 <h3 className="font-semibold text-gray-900 mb-4">Unsubscribe</h3>
                 <div className="space-y-3 text-sm">
-                  <p className="text-gray-500">Newsletter senders will appear here.</p>
+                    {unsubscribeList.map((item) =>(
+                        <div key={item.sender_email} className="flex items-center justify-between gap-2">
+                          {/* name block — left */}
+                          <div className="min-w-0">
+                            <div className="text-[12px] text-gray-700 truncate">{item.sender_name}</div>
+                            <div className="text-[10px] text-gray-400 truncate">{item.sender_email}</div>
+                          </div>
+
+                          {/* count + button — grouped together on the right */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <span className="w-6 text-right text-xs text-gray-400">{item.count}</span>
+                            <a
+                              href={item.unsubscribe}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 rounded-lg border border-blue-400 text-blue-500 text-xs font-medium hover:bg-blue-50"
+                            >
+                              Unsubscribe
+                            </a>
+                          </div>
+                        </div>
+                    ))}
                 </div>
               </div>
 

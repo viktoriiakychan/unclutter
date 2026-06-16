@@ -6,6 +6,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from email.utils import parseaddr
 import time
+from database import load_emails
+import re
 
 from models import Email
 
@@ -281,4 +283,33 @@ class GmailClient:
             return []
 
         return self._fetch_full(new_messages)
-        
+
+    def clean_unsubscribe(self, raw):
+        if not raw:
+            return None
+        match = re.search(r'<\s*(https?://[^>]+?)\s*>', raw)
+        if match:
+            return match.group(1).strip()
+        return None
+
+    def get_unsubscribe_links(self, limit=100):
+        emails = load_emails() 
+        result = []
+        seen = set()
+
+        for email in emails:
+            if email.is_newsletter and email.sender_email not in seen:
+                seen.add(email.sender_email)
+                print(email.unsubscribe)
+
+                # count every email from this same sender
+                count = sum(1 for e in emails if e.sender_email == email.sender_email)
+
+                result.append({
+                    "sender_name": email.sender_name,
+                    "sender_email": email.sender_email,
+                    "unsubscribe": self.clean_unsubscribe(email.unsubscribe),
+                    "count": count
+                })
+
+        return result
