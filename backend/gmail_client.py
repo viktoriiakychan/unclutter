@@ -300,7 +300,6 @@ class GmailClient:
         for email in emails:
             if email.is_newsletter and email.sender_email not in seen:
                 seen.add(email.sender_email)
-                print(email.unsubscribe)
 
                 # count every email from this same sender
                 count = sum(1 for e in emails if e.sender_email == email.sender_email)
