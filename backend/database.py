@@ -113,3 +113,13 @@ def get_existing_ids():
     conn.close()
 
     return {row[0] for row in rows} # a set of ids 
+
+def delete_emails(ids):
+    conn = get_connection() # open connection to emails.db
+    cursor = conn.cursor() # object used to run SQL commnds 
+
+    placeholders = ",".join("?" for _ in ids) # builds a string with one ? per item in ids, separated by commas
+    cursor.execute(f"DELETE FROM emails WHERE id IN ({placeholders})", ids)
+
+    conn.commit()
+    conn.close()

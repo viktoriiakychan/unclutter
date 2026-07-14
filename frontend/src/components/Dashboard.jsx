@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import unreadIcon from "../assets/unread-message.png";
 import newsletterIcon from "../assets/newspaper.png";
@@ -14,81 +14,144 @@ import Sidebar from "./Sidebar";
 import { API, FILTERS, CATEGORIES } from "../utils/constants";
 import { timeAgo } from "../utils/helpers";
 
-function Dashboard({ emails }) {
+function Dashboard({ emails, refetchEmails }) {
   // stats computed from the real data
-  const unreadCount = emails.filter((e) => e.unread).length;
-  const promotionsCount = emails.filter((e) => e.category === "promotions").length;
-  const newsletterCount = emails.filter((e) => e.is_newsletter).length;
-  const senderCount = new Set(emails.map((e) => e.sender_email)).size; 
+    const unreadCount = emails.filter((e) => e.unread).length;
+    const promotionsCount = emails.filter((e) => e.category === "promotions").length;
+    const newsletterCount = emails.filter((e) => e.is_newsletter).length;
+    const senderCount = new Set(emails.map((e) => e.sender_email)).size; 
 
-  const [activeFilter, setActiveFilter] = useState("All");
+    const [activeFilter, setActiveFilter] = useState("All");
 
-  const [senderSearch, setSenderSearch] = useState("");
-  const [userEmail, setUserEmail] = useState("");
-  const [unsubscribeList, setUnsubscribeList] = useState([]);
+    const [senderSearch, setSenderSearch] = useState("");
+    const [userEmail, setUserEmail] = useState("");
+    const [unsubscribeList, setUnsubscribeList] = useState([]);
 
-  useEffect(()=> {
-    fetch(`${API}/auth/me`)
-      .then((r) => r.json())
-      .then((data) => setUserEmail(data.email));
-  }, []);
+    const [selectedIds, setSelectedIds] = useState([]);
 
-  useEffect(()=> {
-    fetch(`${API}/unsubscribe-list`)
-      .then((r) => r.json())
-      .then((data) => setUnsubscribeList(data));
-  }, []);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deletingIds, setDeletingIds] = useState([]); 
 
-  console.log(userEmail);
+    useEffect(()=> {
+        fetch(`${API}/auth/me`)
+        .then((r) => r.json())
+        .then((data) => setUserEmail(data.email));
+    }, []);
 
-  if (!userEmail) {
-    return <CenterMessage text="Loading your inbox..." />;
-  }
+        useEffect(()=> {
+        fetch(`${API}/unsubscribe-list`)
+        .then((r) => r.json())
+        .then((data) => setUnsubscribeList(data));
+    }, []);
 
-  const filteredEmails = emails.filter((email) => {
-    let matchesFilter = true;
+    console.log(userEmail);
 
-    if (activeFilter === "Unread") {
-      matchesFilter = email.unread;
-    } 
-    else if (activeFilter === "Newsletter") {
-      matchesFilter = email.is_newsletter;
-    } 
-    else if (activeFilter === "Promotions") {
-      matchesFilter = email.category === "promotions" && !email.is_newsletter;
-    } 
-    else if (activeFilter === "Updates") {
-      matchesFilter = email.category === "updates" && !email.is_newsletter;
-    } 
-    else if (activeFilter === "Older than 30 days") {
-      const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      matchesFilter = Number(email.internal_date) < thirtyDaysAgo;
+    if (!userEmail) {
+        return <CenterMessage text="Loading your inbox..." />;
     }
 
-    const search = senderSearch.toLowerCase();
-    const matchesSearch =
-      (email.sender_name || "").toLowerCase().includes(search) ||
-      (email.subject || "").toLowerCase().includes(search) ||
-      (email.sender_email || "").toLowerCase().includes(search);
+    const filteredEmails = emails.filter((email) => {
+        let matchesFilter = true;
 
-    return matchesFilter && matchesSearch;
+        if (activeFilter === "Unread") {
+        matchesFilter = email.unread;
+        } 
+        else if (activeFilter === "Newsletter") {
+        matchesFilter = email.is_newsletter;
+        } 
+        else if (activeFilter === "Promotions") {
+        matchesFilter = email.category === "promotions" && !email.is_newsletter;
+        } 
+        else if (activeFilter === "Updates") {
+        matchesFilter = email.category === "updates" && !email.is_newsletter;
+        } 
+        else if (activeFilter === "Older than 30 days") {
+        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        matchesFilter = Number(email.internal_date) < thirtyDaysAgo;
+        }
 
-    return true;
-  });
+        const search = senderSearch.toLowerCase();
+        const matchesSearch =
+        (email.sender_name || "").toLowerCase().includes(search) ||
+        (email.subject || "").toLowerCase().includes(search) ||
+        (email.sender_email || "").toLowerCase().includes(search);
 
-  function getCount(category)
-  {
-    if(category === "Newsletter")
+        return matchesFilter && matchesSearch;
+
+        return true;
+    });
+
+    function getCount(category)
     {
-      return newsletterCount;
+        if(category === "Newsletter")
+        {
+        return newsletterCount;
+        }
+        return emails.filter((email) => email.category === category.toLowerCase() && !email.is_newsletter).length;
     }
-    return emails.filter((email) => email.category === category.toLowerCase() && !email.is_newsletter).length;
-  }
 
-  function getPercentage(categoryCount, category)
-  {
-      return ((categoryCount / emails.length) * 100).toFixed(0);
-  }
+        function getPercentage(categoryCount, category)
+        {
+            return ((categoryCount / emails.length) * 100).toFixed(0);
+        }
+
+    function toggleSelect(id) 
+    {
+        // prev is what the selectedId is right now
+        setSelectedIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        );
+    }
+
+    async function handleDelete() {
+        if (selectedIds.length === 0) return;
+
+        const idsToDelete = selectedIds;
+        setDeletingIds(idsToDelete);
+        setIsDeleting(true);
+        setSelectedIds([]);
+
+        try {
+        const res = await fetch(`${API}/trash`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: idsToDelete }),
+        });
+
+        if (!res.ok) {
+            alert("Failed to delete selected emails.");
+            setIsDeleting(false);
+            setDeletingIds([]);
+            return;
+        }
+
+        await waitUntilGone(idsToDelete);
+        } catch (err) {
+        console.error("Delete failed:", err);
+        setIsDeleting(false);
+        setDeletingIds([]);
+        }
+    }
+
+    async function waitUntilGone(ids, { intervalMs = 30000, maxAttempts = 10 } = {}) {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) 
+        {
+            const latest = await refetchEmails(); 
+            const stillPresent = latest?.some((e) => ids.includes(e.id)); // if lastesy isnt null/undefined + goes through every email e in the new fresh list and checkes if that email's id is in the ones we try to delete -> some returns true when finds match
+
+            if (!stillPresent) { // if none of the emails i try to delete shows up in fresh list
+                setIsDeleting(false);
+                setDeletingIds([]);
+                return;
+            }
+            await new Promise((r) => setTimeout(r, intervalMs)); // if the emails are still present we wait
+        }
+
+        // if loop is done  but nothing found 
+        setIsDeleting(false);
+        setDeletingIds([]);
+    }
+
 
   return (
     <div className="min-h-screen flex bg-gray-50 text-gray-800 overflow-x-hidden">
@@ -202,9 +265,16 @@ function Dashboard({ emails }) {
                 {filteredEmails.map((email) => {
                   return (
                     <div
-                      key={email.id}
-                      className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
+                        key={email.id}
+                        className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
                     >
+                        <input
+                            type="checkbox"
+                            checked={selectedIds.includes(email.id)}
+                            onChange={() => toggleSelect(email.id)}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400 flex-shrink-0 cursor-pointer"
+                        />
+
                       <span
                         className={`w-2 h-2 rounded-full flex-shrink-0 ${
                           email.unread ? "bg-blue-500" : "bg-transparent"
@@ -247,6 +317,25 @@ function Dashboard({ emails }) {
                   );
                 })}
               </div>
+              <div className="grid grid-cols-4 gap-5 px-6 py-2">
+                <span className="">{selectedIds.length} selected</span>
+
+                <button className="px-2 py-1 rounded-lg border border-amber-700/40 bg-amber-700/10 text-amber-700 text-sm font-medium hover:bg-amber-700/20 transition-colors">
+                    Unsubscribe
+                </button>
+
+                <button className="px-2 py-1 rounded-lg border border-slate-500/40 bg-slate-500/10 text-slate-600 text-sm font-medium hover:bg-slate-500/20 transition-colors">
+                    Archive
+                </button>
+
+                <button
+                    onClick={handleDelete}
+                    disabled={selectedIds.length === 0 || isDeleting}
+                    className="px-2 py-1 rounded-lg border border-red-600/40 bg-red-600/10 text-red-600 text-sm font-medium hover:bg-red-600/20 transition-colors">
+                    {isDeleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+
             </div>
 
             {/* RIGHT — two stacked panels */}

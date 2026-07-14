@@ -3,6 +3,8 @@ from dataclasses import asdict
 from flask_cors import CORS
 from gmail_client import GmailClient
 
+from flask import request
+
 import database
 
 app = Flask(__name__) # create the web application 
@@ -67,6 +69,21 @@ def unsubscribe_list():
     client.connect()
 
     return client.get_unsubscribe_links()    
+
+
+@app.route("/trash", methods=["POST"])
+def trash_emails():
+    ids = request.get_json().get("ids")
+    if not ids:
+        return jsonify({"error": "no ids provided"}), 400
+
+    client = GmailClient()
+    client.connect()
+
+    client.trash(ids)
+    database.delete_emails(ids)
+
+    return jsonify({"trashed": len(ids)})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

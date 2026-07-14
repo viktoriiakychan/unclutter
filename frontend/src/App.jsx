@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import unreadIcon from "./assets/unread-message.png";
 import newsletterIcon from "./assets/newspaper.png";
 import promotionIcon from "./assets/promotions.png";
@@ -6,26 +6,18 @@ import totalIcon from "./assets/email.png";
 import searchIcon from "./assets/search.png";
 import clearIcon from "./assets/close.png";
 
-
-
-// components etc.
 import StatCard from "./components/StatCard";
 import CenterMessage from "./components/CenterMessage";
 import Dashboard from "./components/Dashboard";
 
-// constants 
-import { API, FILTERS, CATEGORIES} from "./utils/constants";
-
+import { API, FILTERS, CATEGORIES } from "./utils/constants";
 import { timeAgo } from "./utils/helpers";
 
-
-// GET = retrieve data / get data -> backend just sends the stuff 
-// POST = do something / want the server to acc do something or create / update data
-
 function App() {
-  // checking → loading → loggedOut → ready
   const [phase, setPhase] = useState("checking");
   const [emails, setEmails] = useState([]);
+
+  const isRefreshing = useRef(false);
 
   useEffect(() => {
     checkLogin();
@@ -33,25 +25,33 @@ function App() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      fetch(`${API}/sync`, { method: "POST" })
-        .then(() => fetch(`${API}/emails`))
-        .then((r) => r.json())
-        .then((fresh) => setEmails(fresh));
-    }, 30000);  // every 30 seconds
+      refreshEmails();
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
 
+  // one function, used for both the 30s poll and delete-checking
+  async function refreshEmails() {
+    if (isRefreshing.current) return emails; // skip overlapping calls
+    isRefreshing.current = true;
+    try {
+      await fetch(`${API}/sync`, { method: "POST" });
+      const res = await fetch(`${API}/emails`);
+      const fresh = await res.json();
+      setEmails(fresh);
+      return fresh;
+    } finally {
+      isRefreshing.current = false;
+    }
+  }
+
   async function checkLogin() {
     setPhase("checking");
     const res = await fetch(`${API}/auth/status`);
-    const { logged_in } = await res.json(); // true or false
+    const { logged_in } = await res.json();
 
     if (logged_in) {
-      fetch(`${API}/auth/me`)
-      .then((r) => r.json())
-      .then((data) => setUserEmail(data.email));
-
       await loadEverything();
     } else {
       setPhase("loggedOut");
@@ -60,32 +60,21 @@ function App() {
 
   async function handleLogin() {
     setPhase("loading");
-    await fetch(`${API}/auth/login`, { method: "POST" }); // Google popup
+    await fetch(`${API}/auth/login`, { method: "POST" });
     await loadEverything();
   }
 
   async function loadEverything() {
     setPhase("loading");
-    // 1. show db data immediately
     const res = await fetch(`${API}/emails`);
     setEmails(await res.json());
-    setPhase("ready"); // dashboard shows nowfrom db
+    setPhase("ready");
 
-    // 2. sync in the background 
-    fetch(`${API}/sync`, { method: "POST" })
-    .then(() => fetch(`${API}/emails`))
-    .then((r) => r.json())
-    .then((fresh) => setEmails(fresh)); 
+    refreshEmails();
   }
 
-  // ---- what to show, based on phase ----
-  if (phase === "checking") {
-    return <CenterMessage text="Checking login..." />;
-  }
-
-  if (phase === "loading") {
-    return <CenterMessage text="Loading your inbox..." />;
-  }
+  if (phase === "checking") return <CenterMessage text="Checking login..." />;
+  if (phase === "loading") return <CenterMessage text="Loading your inbox..." />;
 
   if (phase === "loggedOut") {
     return (
@@ -106,7 +95,7 @@ function App() {
     );
   }
 
-  return <Dashboard emails={emails} />;
+  return <Dashboard emails={emails} refetchEmails={refreshEmails} />;
 }
 
 export default App;
