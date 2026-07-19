@@ -453,7 +453,7 @@ function Dashboard({ emails, refetchEmails }) {
 
                     <div className="flex items-center gap-3">
                         <button 
-                            disabled={selectedIds.length === 0 || isArchiving}
+                            disabled={selectedIds.length === 0 || isArchiving || isDeleting}
                             onClick={() => setShowArchiveConfirm(true)}
                             className="px-10 py-1 rounded-lg border border-gray-600/40 bg-gray-600/10 text-gray-600 text-sm font-medium hover:bg-gray-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-600/10"
 
@@ -463,7 +463,7 @@ function Dashboard({ emails, refetchEmails }) {
 
                         <button
                             onClick={() => setShowDeleteConfirm(true)}
-                            disabled={selectedIds.length === 0 || isDeleting}
+                            disabled={selectedIds.length === 0 || isArchiving || isDeleting}
                             className="px-10 py-1 rounded-lg border border-red-600/40 bg-red-600/10 text-red-600 text-sm font-medium hover:bg-red-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600/10"
                         >
                         {isDeleting ? "Deleting..." : "Delete"}
