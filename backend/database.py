@@ -24,7 +24,8 @@ def create_table():
             attachment_size INTEGER,
             is_newsletter INTEGER,
             unsubscribe TEXT,
-            internal_date INTEGER
+            internal_date INTEGER,
+            is_archived INTEGER DEFAULT 0
         )
     """)
 
@@ -70,7 +71,7 @@ def load_emails():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM emails ORDER BY internal_date DESC")
+    cursor.execute("SELECT * FROM emails WHERE is_archived = 0 ORDER BY internal_date DESC")
     rows = cursor.fetchall()
 
     conn.close()
@@ -90,7 +91,8 @@ def load_emails():
             attachment_size=row[9],
             is_newsletter=bool(row[10]),     # 1/0 back to True/False
             unsubscribe=row[11],
-            internal_date=row[12]
+            internal_date=row[12],
+            is_archived=bool(row[13]),
         )
         emails.append(email)
 
@@ -120,6 +122,19 @@ def delete_emails(ids):
 
     placeholders = ",".join("?" for _ in ids) # builds a string with one ? per item in ids, separated by commas
     cursor.execute(f"DELETE FROM emails WHERE id IN ({placeholders})", ids)
+
+    conn.commit()
+    conn.close()
+
+def mark_archived(ids):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    placeholders = ",".join("?" for _ in ids)
+    cursor.execute(
+        f"UPDATE emails SET is_archived = 1 WHERE id IN ({placeholders})",
+        ids
+    )
 
     conn.commit()
     conn.close()

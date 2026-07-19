@@ -16,3 +16,4 @@ class Email:
     category: str
     unsubscribe: str = ""
     internal_date: int = 0
+    is_archived: bool = False

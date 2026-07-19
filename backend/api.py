@@ -85,5 +85,20 @@ def trash_emails():
 
     return jsonify({"trashed": len(ids)})
 
+@app.route("/archive", methods=["POST"])
+def archive_emails():
+    ids = request.get_json().get("ids")
+    if not ids:
+        return jsonify({"error": "no ids provided"}), 400
+
+    client = GmailClient()
+    client.connect()
+
+    client.archive(ids)
+    database.mark_archived(ids)
+
+    return jsonify({"archived": len(ids)})
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

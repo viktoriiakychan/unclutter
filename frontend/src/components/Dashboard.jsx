@@ -32,7 +32,11 @@ function Dashboard({ emails, refetchEmails }) {
     const [isDeleting, setIsDeleting] = useState(false);
     const [deletingIds, setDeletingIds] = useState([]); 
 
-    const [showConfirm, setShowConfirm] = useState(false);
+    const [isArchiving, setIsArchiving] = useState(false);
+    const [archivingIds, setArchivingIds] = useState([]); 
+
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
     useEffect(()=> {
         fetch(`${API}/auth/me`)
@@ -114,55 +118,93 @@ function Dashboard({ emails, refetchEmails }) {
         setSelectedIds([]);
 
         try {
-        const res = await fetch(`${API}/trash`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ids: idsToDelete }),
-        });
+            const res = await fetch(`${API}/trash`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: idsToDelete }),
+            });
 
-        if (!res.ok) {
-            alert("Failed to delete selected emails.");
-            setIsDeleting(false);
-            setDeletingIds([]);
-            return;
-        }
-
-        await waitUntilGone(idsToDelete);
-        } catch (err) {
-        console.error("Delete failed:", err);
-        setIsDeleting(false);
-        setDeletingIds([]);
-        }
-    }
-
-    function showDeleteWindow()
-    {
-        setShowConfirm(true);
-    }
-
-    async function waitUntilGone(ids, { intervalMs = 30000, maxAttempts = 10 } = {}) {
-        for (let attempt = 0; attempt < maxAttempts; attempt++) 
-        {
-            const latest = await refetchEmails(); 
-            const stillPresent = latest?.some((e) => ids.includes(e.id)); // if lastesy isnt null/undefined + goes through every email e in the new fresh list and checkes if that email's id is in the ones we try to delete -> some returns true when finds match
-
-            if (!stillPresent) { // if none of the emails i try to delete shows up in fresh list
+            if (!res.ok) {
+                alert("Failed to delete selected emails.");
                 setIsDeleting(false);
                 setDeletingIds([]);
                 return;
             }
-            await new Promise((r) => setTimeout(r, intervalMs)); // if the emails are still present we wait
-        }
 
-        // if loop is done  but nothing found 
-        setIsDeleting(false);
-        setDeletingIds([]);
+            await waitUntilGone(idsToDelete, () => {
+                setIsDeleting(false);
+                setDeletingIds([]);
+            });
+        } 
+        catch (err) {
+            console.error("Delete failed:", err);
+            setIsDeleting(false);
+            setDeletingIds([]);
+        }
     }
 
+    async function handleArchive() {
+        if (selectedIds.length === 0) return;
+
+        const idsArchive = selectedIds;
+        setArchivingIds(idsArchive);
+        setIsArchiving(true);
+        setSelectedIds([]);
+
+        try {
+            const res = await fetch(`${API}/archive`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: idsArchive }),
+            });
+
+            if (!res.ok) {
+                alert("Failed to archive selected emails.");
+                setIsArchiving(false);
+                setArchivingIds([]);
+                return;
+            }
+
+            await waitUntilGone(idsArchive, () => {
+                setIsArchiving(false);
+                setArchivingIds([]);
+            });
+        } 
+        catch (err) {
+            console.error("Archive failed:", err);
+            setIsArchiving(false);
+            setArchivingIds([]);
+        }
+    }
+
+    async function waitUntilGone(ids, onDone, { intervalMs = 30000, maxAttempts = 10 } = {}) {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const latest = await refetchEmails();
+            const stillPresent = latest?.some((e) => ids.includes(e.id));
+
+            if (!stillPresent) {
+                onDone();
+                return;
+            }
+            await new Promise((r) => setTimeout(r, intervalMs));
+        }
+
+        onDone(); // safety cap — same cleanup, ran too many times
+    }
+
+    const allSelected = filteredEmails.length > 0 && filteredEmails.every(e => selectedIds.includes(e.id));
+
+    function toggleSelectAll() {
+        if (allSelected) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredEmails.map(e => e.id));
+        }
+    }
 
   return (
     <>
-        {showConfirm && (
+        {showDeleteConfirm && (
             <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50">
                 <div className="bg-white rounded-xl shadow-xl p-6 w-100">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -178,15 +220,49 @@ function Dashboard({ emails, refetchEmails }) {
                 <div className="flex justify-end gap-3">
                     <button
                         className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-100"
-                        onClick={() => setShowConfirm(false)}
+                        onClick={() => setShowDeleteConfirm(false)}
                     >
                         Cancel
                     </button>
                     <button
                         className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
                         onClick={() => {
-                            setShowConfirm(false);
+                            setShowDeleteConfirm(false);
                             handleDelete();
+                        }}                   
+                    >
+                        Confirm
+                    </button>
+                </div>
+                </div>
+            </div>
+        )}
+
+        {showArchiveConfirm && (
+            <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl shadow-xl p-6 w-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Are you sure?
+                </h3>
+                <p className="text-sm text-gray-500 mb-6">
+                    You're deleting {selectedIds.length} emails, including{" "}
+                    <span className="font-semibold text-gray-900">
+                        {selectedIds.filter(id => emails.find(e => e.id === id)?.unread).length} unread
+                    </span>{" "}
+                    emails
+                </p>
+                <div className="flex justify-end gap-3">
+                    <button
+                        className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-100"
+                        onClick={() => setShowArchiveConfirm(false)}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                        onClick={() => {
+                            setShowArchiveConfirm(false);
+                            handleArchive();
                         }}                   
                     >
                         Confirm
@@ -358,27 +434,44 @@ function Dashboard({ emails, refetchEmails }) {
                     );
                     })}
                 </div>
-                <div className="grid grid-cols-4 gap-5 px-6 py-2">
-                    <span className="">{selectedIds.length} selected</span>
+                <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
+                    <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={allSelected}
+                                onChange={toggleSelectAll}
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400 cursor-pointer"
+                            />
+                            <span className="text-sm text-gray-600">Select all</span>
+                        </label>
+                        <span className="text-m text-gray-500"></span>
+                        {selectedIds.length > 0 && (
+                            <span className="text-sm text-gray-500">{selectedIds.length} selected</span>
+                        )}
+                    </div>
 
-                    <button className="px-2 py-1 rounded-lg border border-amber-700/40 bg-amber-700/10 text-amber-700 text-sm font-medium hover:bg-amber-700/20 transition-colors">
-                        Unsubscribe
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            disabled={selectedIds.length === 0 || isArchiving}
+                            onClick={() => setShowArchiveConfirm(true)}
+                            className="px-10 py-1 rounded-lg border border-gray-600/40 bg-gray-600/10 text-gray-600 text-sm font-medium hover:bg-gray-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-600/10"
 
-                    <button className="px-2 py-1 rounded-lg border border-slate-500/40 bg-slate-500/10 text-slate-600 text-sm font-medium hover:bg-slate-500/20 transition-colors">
-                        Archive
-                    </button>
+                        >
+                        {isArchiving ? "Archiving..." : "Archive"}
+                        </button>
 
-                    <button
-                        onClick={showDeleteWindow} // used to be handleDelete 
-                        disabled={selectedIds.length === 0 || isDeleting}
-                        className="px-2 py-1 rounded-lg border border-red-600/40 bg-red-600/10 text-red-600 text-sm font-medium hover:bg-red-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600/10"
-                    >
+                        <button
+                            onClick={() => setShowDeleteConfirm(true)}
+                            disabled={selectedIds.length === 0 || isDeleting}
+                            className="px-10 py-1 rounded-lg border border-red-600/40 bg-red-600/10 text-red-600 text-sm font-medium hover:bg-red-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600/10"
+                        >
                         {isDeleting ? "Deleting..." : "Delete"}
-                    </button>
+                        </button>
+                    </div>
                 </div>
 
-                </div>
+            </div>
 
                 {/* RIGHT — two stacked panels */}
                 <div className="space-y-4">
