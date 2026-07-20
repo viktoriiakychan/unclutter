@@ -1,4 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+
+import { Routes, Route } from 'react-router-dom'
+import Cleanup from './components/Cleanup'
+
 import unreadIcon from "./assets/unread-message.png";
 import newsletterIcon from "./assets/newspaper.png";
 import promotionIcon from "./assets/promotions.png";
@@ -95,7 +99,13 @@ function App() {
     );
   }
 
-  return <Dashboard emails={emails} refetchEmails={refreshEmails} />;
+
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard emails={emails} refreshEmails={refreshEmails} />} />
+      <Route path="/cleanup" element={<Cleanup />} />
+    </Routes>
+  );
 }
 
 export default App;

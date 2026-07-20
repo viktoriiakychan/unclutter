@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 function Sidebar() {
   return (
     <aside className="w-56 bg-white border-r border-gray-200 flex flex-col">
@@ -19,10 +21,13 @@ function Sidebar() {
               <span>Dashboard</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-green-400 text-green-900 font-semibold">new</span>
             </a>
-            <a className="flex text-sm  items-center justify-between px-3 py-2 rounded-lg text-red-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
-              <span>Bulk Delete</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">2,847</span>
-            </a>
+            <Link
+                to="/cleanup"
+                className="flex text-sm items-center justify-between px-3 py-2 rounded-lg text-red-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                <span>Clean up</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">2,847</span>
+            </Link>
             <a className="flex text-sm items-center px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
               Archive
             </a>
