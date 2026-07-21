@@ -1,5 +1,6 @@
 from collections import Counter
 import math
+import time
 
 def get_unread_emails(emails):
     count = 0
@@ -86,4 +87,45 @@ def get_top_offender(emails):
         "sender": group[0].sender_name
     }   
 
+def get_stale_promotions(emails, days=30):
 
+    cutoff = time.time() * 1000 - (days * 24 * 60 * 60 * 1000) # x days ago     
+    matches = [e for e in emails if e.category == "promotions" and e.internal_date < cutoff]
+
+    if not matches:
+        return None
+    
+    return {
+        "title": f"Promotions older than {days} days",
+        "subtitle": f"Deals that have likely expire",
+        "count": len(matches),
+        "ids": [e.id for e in matches],
+        "badge": "promotion",
+        "sender": "%"
+
+    }   
+
+def get_old_unread(emails, days=60):
+    cutoff = time.time() * 1000 - (days * 24 * 60 * 60 * 1000) # x days ago     
+    matches = [e for e in emails if e.unread and e.internal_date < cutoff]
+
+    if not matches:
+        return None
+
+    return {
+        "title": f"Unread emails older than {days} days",
+        "subtitle": "These have been forgotten for months",
+        "count": len(matches),
+        "ids": [e.id for e in matches],
+        "badge": "unread",
+        "sender": "Unread"
+
+    }
+
+def get_suggestions(emails):
+    results = [
+        get_top_offender(emails),
+        get_stale_promotions(emails),
+        get_old_unread(emails),
+    ]
+    return [r for r in results if r is not None]
