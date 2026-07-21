@@ -103,7 +103,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Dashboard emails={emails} refreshEmails={refreshEmails} />} />
-      <Route path="/cleanup" element={<Cleanup />} />
+      <Route path="/cleanup" element={<Cleanup emails={emails}/>} />
     </Routes>
   );
 }

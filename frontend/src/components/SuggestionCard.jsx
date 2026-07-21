@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { API } from "../utils/constants";
 
+
 const BADGE_STYLES = {
   "top offender": { badge: "bg-red-100 text-red-700", icon: "bg-red-50 text-red-700" },
   "promotion": { badge: "bg-yellow-100 text-yellow-700", icon: "bg-yellow-50 text-yellow-700" },
