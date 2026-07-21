@@ -11,7 +11,7 @@ import rightArrowIcon from "../assets/right-arrow-blue.png";
 import StatCard from "./StatCard";
 import Header from "./Header";
 import CenterMessage from "./CenterMessage";
-import Sidebar from "./Sidebar";
+import Sidebar from "./Sidebar";    
 
 import { API, FILTERS, CATEGORIES } from "../utils/constants";
 import { timeAgo } from "../utils/helpers";
@@ -273,6 +273,7 @@ function Dashboard({ emails, refetchEmails }) {
                 </div>
             </div>
         )}
+
         <div className="min-h-screen flex bg-gray-50 text-gray-800 overflow-x-hidden">
         
             <Sidebar/>
@@ -280,7 +281,6 @@ function Dashboard({ emails, refetchEmails }) {
         {/* RIGHT SIDE */}
         <div className="flex-1 flex flex-col">
            <Header userEmail={userEmail} />
-
             {/* MAIN CONTENT */}
             <main className="p-6 overflow-y-auto overflow-x-hidden">
 
@@ -309,13 +309,13 @@ function Dashboard({ emails, refetchEmails }) {
                 </div>
             </div>
 
-            {/* 4 STAT CARDS */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
-                <StatCard value={unreadCount} label="unread emails" color="text-green-500" icon={unreadIcon}/>
-                <StatCard value={newsletterCount} label="newsletters" color="text-blue-500" icon={newsletterIcon} />
-                <StatCard value={promotionsCount} label="promotions" color="text-yellow-500" icon={promotionIcon}/>
-                <StatCard value={emails.length} label="total emails" color="text-red-500" icon={totalIcon}/>
-            </div>
+                {/* 4 STAT CARDS */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                    <StatCard value={unreadCount} label="unread emails" color="text-green-500" icon={unreadIcon}/>
+                    <StatCard value={newsletterCount} label="newsletters" color="text-blue-500" icon={newsletterIcon} />
+                    <StatCard value={promotionsCount} label="promotions" color="text-yellow-500" icon={promotionIcon}/>
+                    <StatCard value={emails.length} label="total emails" color="text-red-500" icon={totalIcon}/>
+                </div>
 
             {/* TWO COLUMN: email list (left) + panels (right) */}
             <div className="grid grid-cols-3 gap-6">

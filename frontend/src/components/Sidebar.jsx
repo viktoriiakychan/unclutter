@@ -17,10 +17,15 @@ function Sidebar() {
           </p>
 
           <div className="space-y-1">
-            <a className="flex text-sm items-center justify-between px-3 py-2 rounded-lg bg-blue-600 text-white font-medium">
+
+            <Link 
+                to="/"
+                className="flex text-sm items-center justify-between px-3 py-2 rounded-lg bg-blue-600 text-white font-medium"
+                >
               <span>Dashboard</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-green-400 text-green-900 font-semibold">new</span>
-            </a>
+            </Link>
+            
             <Link
                 to="/cleanup"
                 className="flex text-sm items-center justify-between px-3 py-2 rounded-lg text-red-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700"

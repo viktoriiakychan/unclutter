@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 from dataclasses import asdict
 from flask_cors import CORS
 from gmail_client import GmailClient
+from analytics import get_top_offender
 
 from flask import request
 
@@ -98,6 +99,12 @@ def archive_emails():
     database.mark_archived(ids)
 
     return jsonify({"archived": len(ids)})
+
+@app.route("/suggestions/top-offender")
+def top_offender():
+    emails = database.load_emails()
+    result = get_top_offender(emails)
+    return jsonify(result)
 
 
 if __name__ == "__main__":
