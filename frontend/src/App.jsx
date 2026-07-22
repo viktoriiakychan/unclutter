@@ -102,8 +102,8 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Dashboard emails={emails} refreshEmails={refreshEmails} />} />
-      <Route path="/cleanup" element={<Cleanup emails={emails}/>} />
+      <Route path="/" element={<Dashboard emails={emails} refetchEmails ={refreshEmails} />} />
+      <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails ={refreshEmails}/>} />
     </Routes>
   );
 }

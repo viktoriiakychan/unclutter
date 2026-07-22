@@ -11,7 +11,9 @@ import rightArrowIcon from "../assets/right-arrow-blue.png";
 import StatCard from "./StatCard";
 import Header from "./Header";
 import CenterMessage from "./CenterMessage";
-import Sidebar from "./Sidebar";    
+import Sidebar from "./Sidebar";
+import LoadingOverlay from "./LoadingOverlay";
+
 
 import { API, FILTERS, CATEGORIES } from "../utils/constants";
 import { timeAgo } from "../utils/helpers";
@@ -150,7 +152,7 @@ function Dashboard({ emails, refetchEmails }) {
 
         const idsArchive = selectedIds;
         setArchivingIds(idsArchive);
-        setIsArchiving(true);
+        setIsArchiving(true);   
         setSelectedIds([]);
 
         try {
@@ -179,20 +181,21 @@ function Dashboard({ emails, refetchEmails }) {
         }
     }
 
-    async function waitUntilGone(ids, onDone, { intervalMs = 30000, maxAttempts = 10 } = {}) {
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            const latest = await refetchEmails();
-            const stillPresent = latest?.some((e) => ids.includes(e.id));
+    async function waitUntilGone(ids, onDone, { intervalMs = 1500, maxAttempts = 15 } = {}) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const latest = await refetchEmails();
+        const stillPresent = latest?.some((e) => ids.includes(e.id));
 
-            if (!stillPresent) {
-                onDone();
-                return;
-            }
-            await new Promise((r) => setTimeout(r, intervalMs));
+        if (!stillPresent) {
+            onDone();
+            return;
         }
-
-        onDone(); // safety cap — same cleanup, ran too many times
+        await new Promise((r) => setTimeout(r, intervalMs));
     }
+
+    console.warn("waitUntilGone: gave up after max attempts, emails may still be present");
+    onDone();
+}
 
     const allSelected = filteredEmails.length > 0 && filteredEmails.every(e => selectedIds.includes(e.id));
 
@@ -322,6 +325,7 @@ function Dashboard({ emails, refetchEmails }) {
 
                 {/* LEFT — email list */}
                 <div className="col-span-2 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
+                   
                     <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
                         <h2 className="font-semibold text-gray-900">My Emails</h2>
                         <span className="text-sm text-gray-500">{emails.length} total</span>
@@ -367,61 +371,66 @@ function Dashboard({ emails, refetchEmails }) {
                         </div>
                     </div>
 
-                    <div className="max-h-79 overflow-y-auto">
-                        {filteredEmails.map((email) => {
-                        return (
-                            <div
-                                key={email.id}
-                                className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={selectedIds.includes(email.id)}
-                                    onChange={() => toggleSelect(email.id)}
-                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400 flex-shrink-0 cursor-pointer"
-                                />
+                    <div className="relative">
+                        {isDeleting && <LoadingOverlay action="delete" />}
+                        {isArchiving && <LoadingOverlay action="archive" />}
+                        <div className="relative max-h-79 overflow-y-auto">
 
-                            <span
-                                className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                email.unread ? "bg-blue-500" : "bg-transparent"
-                                }`}
-                            ></span>
+                            {filteredEmails.map((email) => {
+                            return (
+                                <div
+                                    key={email.id}
+                                    className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.includes(email.id)}
+                                        onChange={() => toggleSelect(email.id)}
+                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400 flex-shrink-0 cursor-pointer"
+                                    />
 
-                            <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
-                                {email.sender_name ? email.sender_name[0].toUpperCase() : "?"}
-                            </div>
-                            <div className="flex-1 min-w-0">
+                                <span
+                                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                    email.unread ? "bg-blue-500" : "bg-transparent"
+                                    }`}
+                                ></span>
+
+                                <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
+                                    {email.sender_name ? email.sender_name[0].toUpperCase() : "?"}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    
+                                    <div className="text-xs text-gray-400 truncate">{email.sender_name}</div>
+                                    {email.unread ? (
+                                        <div className="text-sm font-medium text-gray truncate">{email.subject}</div>
+                                    ) : (
+                                        <div className="text-sm font-normal text-gray truncate">{email.subject}</div>
+                                    )}
+                                </div>
                                 
-                                <div className="text-xs text-gray-400 truncate">{email.sender_name}</div>
-                                {email.unread ? (
-                                    <div className="text-sm font-medium text-gray truncate">{email.subject}</div>
+                                {email.is_newsletter ? (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium flex-shrink-0">
+                                    newsletter
+                                    </span>
                                 ) : (
-                                    <div className="text-sm font-normal text-gray truncate">{email.subject}</div>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                                        email.category === "promotions" ? "bg-yellow-100 text-yellow-700" :
+                                        email.category === "social"     ? "bg-purple-100 text-purple-700" :
+                                        email.category === "updates"    ? "bg-green-100 text-green-700" :
+                                        "bg-gray-100 text-gray-700"
+                                    }`}> 
+                                        {email.category}
+                                    </span>
                                 )}
-                            </div>
-                            
-                            {email.is_newsletter ? (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium flex-shrink-0">
-                                newsletter
-                                </span>
-                            ) : (
-                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
-                                    email.category === "promotions" ? "bg-yellow-100 text-yellow-700" :
-                                    email.category === "social"     ? "bg-purple-100 text-purple-700" :
-                                    email.category === "updates"    ? "bg-green-100 text-green-700" :
-                                    "bg-gray-100 text-gray-700"
-                                }`}> 
-                                    {email.category}
-                                </span>
-                            )}
 
-                            <span className="text-[10px] py-0.5 font-small text-gray-400 flex-shrink-0">
-                                {timeAgo(email.internal_date)}
-                                </span>
-                            
-                            </div>
-                        );
-                        })}
+                                <span className="text-[10px] py-0.5 font-small text-gray-400 flex-shrink-0">
+                                    {timeAgo(email.internal_date)}
+                                    </span>
+                                
+                                </div>
+                            );
+                            })}
+                        </div>
                     </div>
                     <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
                         <div className="flex items-center gap-3">

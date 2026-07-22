@@ -24,25 +24,29 @@ const ICONS = {
   },
 };
 
-export default function LoadingOverlay({ action = "delete", message }) {
+export default function LoadingOverlay({ action = "delete", message, fullScreen = false }) {
   const icon = ICONS[action] || ICONS.delete;
   const defaultMessage = action === "archive" ? "Archiving your emails..." : "Cleaning up your inbox...";
 
+  const positionClasses = fullScreen
+    ? "fixed inset-0 z-50"
+    : "absolute inset-0 max-h-80 z-40";
+
   return (
-    <div className="absolute inset-0 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center z-40">
-      <style>{`
-        @keyframes bounce-in {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-        @keyframes flyIn {
-          0% { transform: translateY(-16px) scale(0.5); opacity: 0; }
-          60% { opacity: 1; }
-          100% { transform: translateY(4px) scale(0.3); opacity: 0; }
-        }
-        .icon-bounce { animation: bounce-in 1s ease-in-out infinite; }
-        .item-1 { animation: flyIn 1.2s ease-in infinite; animation-delay: 0s; }
-        .item-2 { animation: flyIn 1.2s ease-in infinite; animation-delay: 0.4s; }
+    <div className={`${positionClasses} bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center`}>
+        <style>{`
+            @keyframes bounce-in {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+            }
+            @keyframes flyIn {
+            0% { transform: translateY(-16px) scale(0.5); opacity: 0; }
+            60% { opacity: 1; }
+            100% { transform: translateY(4px) scale(0.3); opacity: 0; }
+            }
+            .icon-bounce { animation: bounce-in 1s ease-in-out infinite; }
+            .item-1 { animation: flyIn 1.2s ease-in infinite; animation-delay: 0s; }
+            .item-2 { animation: flyIn 1.2s ease-in infinite; animation-delay: 0.4s; }
       `}</style>
 
       <div className="relative w-16 h-16 mb-5 flex items-center justify-center">
