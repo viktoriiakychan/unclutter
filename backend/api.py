@@ -11,10 +11,11 @@ import database
 app = Flask(__name__) # create the web application 
 CORS(app)
 
+database.create_table()
+database.create_activity_table()
 
 @app.route("/emails") # when someone visits /emails run this function 
 def get_emails():
-    database.create_table()
     emails = database.load_emails()
 
     # turn each Email object into a dict so it can become JSON
@@ -115,6 +116,37 @@ def suggestions():
 def activity():
     activity = database.get_activity_log()
     return jsonify(activity)
+
+@app.route("/untrash", methods=["POST"])
+def untrash_emails():
+    ids = request.get_json().get("ids")
+    if not ids:
+        return jsonify({"error": "no ids provided"}), 400
+
+    client = GmailClient()
+    client.connect()
+    client.untrash(ids)
+
+    database.restore_from_activity_log(ids)
+
+    return jsonify({"untrashed": len(ids)})
+
+
+@app.route("/unarchive", methods=["POST"])
+def unarchive_emails():
+    ids = request.get_json().get("ids")
+    if not ids:
+        return jsonify({"error": "no ids provided"}), 400
+
+    client = GmailClient()
+    client.connect()
+    client.unarchive(ids)
+
+    database.mark_unarchived(ids)
+
+    return jsonify({"unarchived": len(ids)})
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

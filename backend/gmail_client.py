@@ -263,6 +263,25 @@ class GmailClient:
 
         print(f"Moved {len(email_ids)} emails to Trash.")
 
+    def untrash(self, email_ids):
+        for email_id in email_ids:
+            self.service.users().messages().untrash(
+                userId="me",
+                id=email_id
+            ).execute()
+
+        print(f"Moved {len(email_ids)} emails from Trash.")
+
+    def unarchive(self, email_ids):
+        for email_id in email_ids:
+            self.service.users().messages().modify(
+                userId="me",
+                id=email_id,
+                body={"addLabelIds": ["INBOX"]}
+            ).execute()
+
+        print(f"Unarchived {len(email_ids)} emails.")
+
     def get_profile(self):
         profile = self.service.users().getProfile(userId="me").execute()
 

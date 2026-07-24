@@ -30,14 +30,14 @@ function App() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      refreshEmails();
+      refetchEmails();
     }, 30000);
 
     return () => clearInterval(interval);
   }, []);
 
   // one function, used for both the 30s poll and delete-checking
-  async function refreshEmails() {
+  async function refetchEmails() {
     if (isRefreshing.current) return emails; // skip overlapping calls
     isRefreshing.current = true;
     try {
@@ -75,7 +75,7 @@ function App() {
     setEmails(await res.json());
     setPhase("ready");
 
-    refreshEmails();
+    refetchEmails();
   }
 
   if (phase === "checking") return <CenterMessage text="Checking login..." />;
@@ -103,9 +103,9 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={<Dashboard emails={emails} refetchEmails ={refreshEmails} />} />
-      <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails ={refreshEmails}/>} />
-      <Route path="/activity" element={<Activity/>} />
+      <Route path="/" element={<Dashboard emails={emails} refetchEmails ={refetchEmails} />} />
+      <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails ={refetchEmails}/>} />
+      <Route path="/activity" element={<Activity refetchEmails ={refetchEmails} />} />
     </Routes>
   );
 }

@@ -37,11 +37,21 @@ def create_activity_table():
     cursor = conn.cursor()
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS activity_log(
+        CREATE TABLE IF NOT EXISTS activity_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email_id TEXT NOT NULL,
-            subject TEXT,
+            thread_id TEXT,
             sender_name TEXT,
+            sender_email TEXT,
+            subject TEXT,
+            date TEXT,
+            unread INTEGER,
+            category TEXT,
+            attachment_count INTEGER,
+            attachment_size INTEGER,
+            is_newsletter INTEGER,
+            unsubscribe TEXT,
+            internal_date INTEGER,
             action_type TEXT NOT NULL, -- 'deleted' or 'archived'
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -137,19 +147,25 @@ def get_existing_ids():
     return {row[0] for row in rows} # a set of ids 
 
 def delete_emails(ids):
-    conn = get_connection() # open connection to emails.db
-    cursor = conn.cursor() # object used to run SQL commnds 
-    
+    conn = get_connection()
+    cursor = conn.cursor()
+
     for email_id in ids:
-        row = conn.execute("SELECT subject, sender_name FROM emails WHERE id = ?", (email_id,)).fetchone()
+        row = conn.execute("SELECT * FROM emails WHERE id = ?", (email_id,)).fetchone()
 
         if row:
-            cursor.execute(
-                "INSERT INTO activity_log (email_id, subject, sender_name, action_type) VALUES (?, ?, ?, ?)", 
-                (email_id, row[0], row[1], "deleted")
-            )
+            cursor.execute("""
+                INSERT INTO activity_log
+                (email_id, thread_id, sender_name, sender_email, subject, date,
+                 unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date, action_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                row[0], row[1], row[2], row[3], row[4], row[5],
+                row[6], row[7], row[8], row[9], row[10], row[11], row[12],
+                "deleted"
+            ))
 
-    placeholders = ",".join("?" for _ in ids) # builds a string with one ? per item in ids, separated by commas
+    placeholders = ",".join("?" for _ in ids)
     cursor.execute(f"DELETE FROM emails WHERE id IN ({placeholders})", ids)
 
     conn.commit()
@@ -160,22 +176,38 @@ def mark_archived(ids):
     cursor = conn.cursor()
 
     for email_id in ids:
-        row = conn.execute("SELECT subject, sender_name FROM emails WHERE id = ?", (email_id,)).fetchone()
+        row = conn.execute("SELECT * FROM emails WHERE id = ?", (email_id,)).fetchone()
 
         if row:
-            cursor.execute(
-                "INSERT INTO activity_log (email_id, subject, sender_name, action_type) VALUES (?, ?, ?, ?)", 
-                (email_id, row[0], row[1], "archived")
-            )
+            cursor.execute("""
+                INSERT INTO activity_log
+                (email_id, thread_id, sender_name, sender_email, subject, date,
+                 unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date, action_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                row[0], row[1], row[2], row[3], row[4], row[5],
+                row[6], row[7], row[8], row[9], row[10], row[11], row[12],
+                "archived"
+            ))
 
     placeholders = ",".join("?" for _ in ids)
-    cursor.execute(
-        f"UPDATE emails SET is_archived = 1 WHERE id IN ({placeholders})",
-        ids
-    )
+    cursor.execute(f"UPDATE emails SET is_archived = 1 WHERE id IN ({placeholders})", ids)
 
     conn.commit()
     conn.close()
+
+    def mark_unarchived(ids):
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        placeholders = ",".join("?" for _ in ids)
+        cursor.execute(
+            f"UPDATE emails SET is_archived = 0 WHERE id IN ({placeholders})",
+            ids
+        )
+
+        conn.commit()
+        conn.close()    
 
 def get_activity_log(limit=100):
     conn = get_connection()
@@ -188,10 +220,47 @@ def get_activity_log(limit=100):
         {
             "id": row[0],
             "email_id": row[1],
-            "subject": row[2],
+            "thread_id": row[2],
             "sender_name": row[3],
-            "action_type": row[4],
-            "timestamp": row[5],
+            "sender_email": row[4],
+            "subject": row[5],
+            "date": row[6],
+            "unread": row[7],
+            "category": row[8],
+            "attachment_count": row[9],
+            "attachment_size": row[10],
+            "is_newsletter": row[11],
+            "unsubscribe": row[12],
+            "internal_date": row[13],
+            "action_type": row[14],
+            "timestamp": row[15],
         }
         for row in rows
     ]
+
+def restore_from_activity_log(ids):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    for email_id in ids:
+        # get the most recent log entry for this email
+        row = conn.execute(
+            "SELECT * FROM activity_log WHERE email_id = ? ORDER BY timestamp DESC LIMIT 1",
+            (email_id,)
+        ).fetchone()
+
+        if row:
+            cursor.execute("""
+                INSERT OR REPLACE INTO emails
+                (id, thread_id, sender_name, sender_email, subject, date,
+                 unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                row[1], row[2], row[3], row[4], row[5], row[6],
+                row[7], row[8], row[9], row[10], row[11], row[12], row[13]
+            ))
+            # remove the log entry now that it's been restored
+            cursor.execute("DELETE FROM activity_log WHERE id = ?", (row[0],))
+
+    conn.commit()
+    conn.close()
