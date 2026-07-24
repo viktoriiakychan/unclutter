@@ -277,15 +277,15 @@ function Dashboard({ emails, refetchEmails }) {
             </div>
         )}
 
-        <div className="min-h-screen flex bg-gray-50 text-gray-800 overflow-x-hidden">
+        <div className="h-screen flex bg-gray-50 text-gray-800 overflow-hidden">
         
             <Sidebar/>
 
         {/* RIGHT SIDE */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
            <Header userEmail={userEmail} />
             {/* MAIN CONTENT */}
-            <main className="p-6 overflow-y-auto overflow-x-hidden">
+            <main className="flex-1 p-6 overflow-y-auto overflow-x-hidden">
 
             {/* WELCOME BANNER */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 flex items-center justify-between">
@@ -321,7 +321,7 @@ function Dashboard({ emails, refetchEmails }) {
                 </div>
 
             {/* TWO COLUMN: email list (left) + panels (right) */}
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-3 gap-6 items-start">
 
                 {/* LEFT — email list */}
                 <div className="col-span-2 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -503,7 +503,7 @@ function Dashboard({ emails, refetchEmails }) {
 
 
                     {/* panel 2 — unsubscribe */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-5 min-h-60">
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 max-h-60 overflow-y-auto">
                         <h3 className="font-semibold text-gray-900 mb-4">Unsubscribe</h3>
                         <div className="space-y-3 text-sm">
                             {unsubscribeList.map((item) =>(

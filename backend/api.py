@@ -111,6 +111,10 @@ def suggestions():
     emails = database.load_emails()
     return jsonify(get_suggestions(emails))
 
+@app.route("/activity")
+def activity():
+    activity = database.get_activity_log()
+    return jsonify(activity)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

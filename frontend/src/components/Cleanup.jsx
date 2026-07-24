@@ -256,13 +256,13 @@ export default function Cleanup({ emails, refetchEmails }) {
                 </div>
             )}
 
-            <div className="min-h-screen flex bg-gray-50 text-gray-800 overflow-x-hidden">
+            <div className="h-screen flex bg-gray-50 text-gray-800 overflow-hidden">
                 <Sidebar />
 
-                <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex-1 flex flex-col overflow-hidden">
                     <Header userEmail={userEmail} />
 
-                    <main className="p-6 overflow-y-auto overflow-x-hidden">
+                    <main className=" flex-1 p-6 overflow-y-auto overflow-x-hidden">
                         {isDeleting && <LoadingOverlay action="delete" fullScreen />}
                         {/* {isDeletingMain && <LoadingOverlay action="delete" />}
                         {isArchiving && <LoadingOverlay action="archive" />} */}

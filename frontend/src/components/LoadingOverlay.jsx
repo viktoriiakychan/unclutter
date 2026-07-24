@@ -13,12 +13,12 @@ const ICONS = {
     ),
   },
   archive: {
-    color: "#2563eb", // blue-600, matches your brand
+    color: "#6b7280", // gray-500
     render: () => (
       <svg width="44" height="40" viewBox="0 0 44 40" fill="none">
-        <rect x="2" y="0" width="40" height="12" rx="3" fill="#2563eb" />
-        <rect x="4" y="12" width="36" height="26" rx="3" fill="#bfdbfe" />
-        <rect x="16" y="20" width="12" height="4" rx="2" fill="#2563eb" />
+        <rect x="2" y="0" width="40" height="12" rx="3" fill="#6b7280" />
+        <rect x="4" y="12" width="36" height="26" rx="3" fill="#e5e7eb" />
+        <rect x="16" y="20" width="12" height="4" rx="2" fill="#6b7280" />
       </svg>
     ),
   },

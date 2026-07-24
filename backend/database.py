@@ -32,8 +32,28 @@ def create_table():
     conn.commit()
     conn.close()
 
+def create_activity_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS activity_log(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email_id TEXT NOT NULL,
+            subject TEXT,
+            sender_name TEXT,
+            action_type TEXT NOT NULL, -- 'deleted' or 'archived'
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
 if __name__ == "__main__":
     create_table()
+    create_activity_table()
     print("Database and table created.")
 
 
@@ -119,6 +139,15 @@ def get_existing_ids():
 def delete_emails(ids):
     conn = get_connection() # open connection to emails.db
     cursor = conn.cursor() # object used to run SQL commnds 
+    
+    for email_id in ids:
+        row = conn.execute("SELECT subject, sender_name FROM emails WHERE id = ?", (email_id,)).fetchone()
+
+        if row:
+            cursor.execute(
+                "INSERT INTO activity_log (email_id, subject, sender_name, action_type) VALUES (?, ?, ?, ?)", 
+                (email_id, row[0], row[1], "deleted")
+            )
 
     placeholders = ",".join("?" for _ in ids) # builds a string with one ? per item in ids, separated by commas
     cursor.execute(f"DELETE FROM emails WHERE id IN ({placeholders})", ids)
@@ -130,6 +159,15 @@ def mark_archived(ids):
     conn = get_connection()
     cursor = conn.cursor()
 
+    for email_id in ids:
+        row = conn.execute("SELECT subject, sender_name FROM emails WHERE id = ?", (email_id,)).fetchone()
+
+        if row:
+            cursor.execute(
+                "INSERT INTO activity_log (email_id, subject, sender_name, action_type) VALUES (?, ?, ?, ?)", 
+                (email_id, row[0], row[1], "archived")
+            )
+
     placeholders = ",".join("?" for _ in ids)
     cursor.execute(
         f"UPDATE emails SET is_archived = 1 WHERE id IN ({placeholders})",
@@ -138,3 +176,22 @@ def mark_archived(ids):
 
     conn.commit()
     conn.close()
+
+def get_activity_log(limit=100):
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM activity_log ORDER BY timestamp DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": row[0],
+            "email_id": row[1],
+            "subject": row[2],
+            "sender_name": row[3],
+            "action_type": row[4],
+            "timestamp": row[5],
+        }
+        for row in rows
+    ]

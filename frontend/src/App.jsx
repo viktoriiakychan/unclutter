@@ -16,6 +16,7 @@ import Dashboard from "./components/Dashboard";
 
 import { API, FILTERS, CATEGORIES } from "./utils/constants";
 import { timeAgo } from "./utils/helpers";
+import Activity from "./components/ActivityLog";
 
 function App() {
   const [phase, setPhase] = useState("checking");
@@ -104,6 +105,7 @@ function App() {
     <Routes>
       <Route path="/" element={<Dashboard emails={emails} refetchEmails ={refreshEmails} />} />
       <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails ={refreshEmails}/>} />
+      <Route path="/activity" element={<Activity/>} />
     </Routes>
   );
 }
