@@ -250,7 +250,7 @@ function Dashboard({ emails, refetchEmails }) {
                     Are you sure?
                 </h3>
                 <p className="text-sm text-gray-500 mb-6">
-                    You're deleting {selectedIds.length} emails, including{" "}
+                    You're archiving {selectedIds.length} emails, including{" "}
                     <span className="font-semibold text-gray-900">
                         {selectedIds.filter(id => emails.find(e => e.id === id)?.unread).length} unread
                     </span>{" "}
@@ -264,7 +264,7 @@ function Dashboard({ emails, refetchEmails }) {
                         Cancel
                     </button>
                     <button
-                        className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                        className="px-4 py-2 rounded-lg bg-gray-500 text-white text-sm font-medium hover:bg-gray-600"
                         onClick={() => {
                             setShowArchiveConfirm(false);
                             handleArchive();
@@ -377,15 +377,21 @@ function Dashboard({ emails, refetchEmails }) {
                         <div className="relative max-h-79 overflow-y-auto">
 
                             {filteredEmails.map((email) => {
+    const isSelected = selectedIds.includes(email.id);
+
                             return (
                                 <div
                                     key={email.id}
-                                    className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
+                                    onClick={() => toggleSelect(email.id)}
+                                    className={`flex items-center gap-4 px-5 py-3 border-b border-gray-100 cursor-pointer transition-colors ${
+                                        isSelected ? "bg-blue-50" : "hover:bg-gray-50"
+                                    }`}
                                 >
                                     <input
                                         type="checkbox"
-                                        checked={selectedIds.includes(email.id)}
+                                        checked={isSelected}
                                         onChange={() => toggleSelect(email.id)}
+                                        onClick={(e) => e.stopPropagation()}
                                         className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400 flex-shrink-0 cursor-pointer"
                                     />
 

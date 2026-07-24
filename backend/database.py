@@ -196,18 +196,18 @@ def mark_archived(ids):
     conn.commit()
     conn.close()
 
-    def mark_unarchived(ids):
-        conn = get_connection()
-        cursor = conn.cursor()
+def mark_unarchived(ids):
+    conn = get_connection()
+    cursor = conn.cursor()
 
-        placeholders = ",".join("?" for _ in ids)
-        cursor.execute(
-            f"UPDATE emails SET is_archived = 0 WHERE id IN ({placeholders})",
-            ids
-        )
+    placeholders = ",".join("?" for _ in ids)
+    cursor.execute(
+        f"UPDATE emails SET is_archived = 0 WHERE id IN ({placeholders})",
+        ids
+    )
 
-        conn.commit()
-        conn.close()    
+    conn.commit()
+    conn.close()    
 
 def get_activity_log(limit=100):
     conn = get_connection()
