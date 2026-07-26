@@ -162,7 +162,14 @@ def get_unread_stats(conn, days=30):
 def get_category_breakdown(conn, days=30):
     cutoff_ms = _cutoff_ms(days)
     rows = conn.execute(
-        "SELECT category, COUNT(*) FROM emails WHERE internal_date >= ? GROUP BY category",
+        """
+        SELECT
+            CASE WHEN is_newsletter = 1 THEN 'newsletter' ELSE category END as effective_category,
+            COUNT(*)
+        FROM emails
+        WHERE internal_date >= ?
+        GROUP BY effective_category
+        """,
         (cutoff_ms,)
     ).fetchall()
     return [{"name": r[0], "count": r[1]} for r in rows]

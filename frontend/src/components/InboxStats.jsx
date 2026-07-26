@@ -13,17 +13,16 @@ import { API } from "../utils/constants";
 
 const CATEGORY_STYLES = {
   promotions: { dot: "bg-yellow-500", stroke: "text-yellow-500" },
-  updates: { dot: "bg-green-500", stroke: "text-green-500" },
+  updates: { dot: "bg-green-400", stroke: "text-green-400" },
   social: { dot: "bg-purple-500", stroke: "text-purple-500" },
-  forums: { dot: "bg-gray-400", stroke: "text-gray-400" },
-  other: { dot: "bg-gray-500", stroke: "text-gray-500" },
+  newsletter: { dot: "bg-orange-400", stroke: "text-orange-400" }, // matches your orange newsletter badge
+  other: { dot: "bg-gray-400", stroke: "text-gray-400" },
 };
-
 const FALLBACK_STYLE = { dot: "bg-gray-300", stroke: "text-gray-300" };
 
 const READ_UNREAD_STYLES = {
-  unread: { dot: "bg-green-500", stroke: "text-green-500" },
-  read: { dot: "bg-gray-300", stroke: "text-gray-300" },
+  unread: { dot: "bg-blue-500", stroke: "text-blue-500" },
+  read: { dot: "bg-green-300", stroke: "text-green-300" },
 };
 
 function toDisplayName(category) {
