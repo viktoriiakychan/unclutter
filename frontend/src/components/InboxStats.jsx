@@ -1,0 +1,278 @@
+import { useState, useEffect } from "react";
+
+import Sidebar from "./Sidebar";
+import Header from "./Header";
+import CenterMessage from "./CenterMessage";
+
+import { API } from "../utils/constants";
+
+/* ---------- category display + color lookup ----------
+   Keyed by the raw lowercase strings your backend actually returns
+   (promotions, updates, social, forums, other). Static, so it stays
+   at module scope — it never changes at runtime. */
+
+const CATEGORY_STYLES = {
+  promotions: { dot: "bg-yellow-500", stroke: "text-yellow-500" },
+  updates: { dot: "bg-green-500", stroke: "text-green-500" },
+  social: { dot: "bg-purple-500", stroke: "text-purple-500" },
+  forums: { dot: "bg-gray-400", stroke: "text-gray-400" },
+  other: { dot: "bg-gray-500", stroke: "text-gray-500" },
+};
+
+const FALLBACK_STYLE = { dot: "bg-gray-300", stroke: "text-gray-300" };
+
+const READ_UNREAD_STYLES = {
+  unread: { dot: "bg-green-500", stroke: "text-green-500" },
+  read: { dot: "bg-gray-300", stroke: "text-gray-300" },
+};
+
+function toDisplayName(category) {
+  const safe = category ?? "other"; // guards the NULL-category row in your DB
+  return safe.charAt(0).toUpperCase() + safe.slice(1);
+}
+
+/* ---------- donut math ---------- */
+// Turns a list of {count} objects into stroke-dasharray/offset values
+// for stacked <circle> segments. Reused for both donuts below.
+function buildDonutSegments(data, radius) {
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+  if (total === 0) return [];
+
+  const circumference = 2 * Math.PI * radius;
+  let cursor = 0;
+
+  return data.map((item) => {
+    const fraction = item.count / total;
+    const length = fraction * circumference;
+    const segment = {
+      ...item,
+      pct: Math.round(fraction * 100),
+      dasharray: `${length} ${circumference - length}`,
+      dashoffset: -cursor,
+    };
+    cursor += length;
+    return segment;
+  });
+}
+
+const CATEGORY_RADIUS = 70;
+const READ_UNREAD_RADIUS = 55;
+
+const STRIP_COLORS = {
+  totalEmails: "text-red-500",
+  percentageUnread: "text-green-500",
+  cleanedUp: "text-blue-500",
+  averageEmailsPerDay: "text-gray-700",
+  oldestUnreadDays: "text-red-500",
+};
+
+function InboxStats() {
+  const [userEmail, setUserEmail] = useState("");
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/auth/me`)
+      .then((r) => r.json())
+      .then((data) => setUserEmail(data.email));
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API}/stats`)
+      .then((r) => r.json())
+      .then((data) => setStats(data));
+  }, []);
+
+  if (!userEmail || !stats) {
+    return <CenterMessage text="Loading your stats..." />;
+  }
+
+
+  const categoryData = stats.categoriesStats.map((c) => {
+    const key = c.name ?? "other";
+    const style = CATEGORY_STYLES[key] ?? FALLBACK_STYLE;
+    return {
+      key,
+      name: toDisplayName(c.name),
+      count: c.count,
+      dot: style.dot,
+      stroke: style.stroke,
+    };
+  });
+
+  const readUnreadData = [
+    { key: "unread", name: "Unread", count: stats.unread, ...READ_UNREAD_STYLES.unread },
+    { key: "read", name: "Read", count: stats.read, ...READ_UNREAD_STYLES.read },
+  ];
+
+  const categorySegments = buildDonutSegments(categoryData, CATEGORY_RADIUS);
+  const readUnreadSegments = buildDonutSegments(readUnreadData, READ_UNREAD_RADIUS);
+
+  return (
+    <div className="h-screen flex bg-gray-50 text-gray-800 overflow-hidden">
+      <Sidebar />
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header userEmail={userEmail} />
+
+        <main className="flex-1 p-6 overflow-y-auto overflow-x-hidden">
+
+          {/* PAGE HEAD */}
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <h2 className="text-l font-bold text-gray-900">Inbox Stats</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                How your inbox is trending, and where the clutter is coming from.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {["7 days", "30 days", "90 days"].map((label) => (
+                <button
+                  key={label}
+                  className={`text-[10px] px-3 py-1 rounded-full font-medium border ${
+                    label === "30 days"
+                      ? "bg-green-100 text-green-700 border-green-500"
+                      : "text-gray-700 border-gray-300 hover:bg-gray-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* STAT STRIP */}
+          <div className="flex bg-white rounded-xl border border-gray-200 mb-6 overflow-hidden">
+            <StripItem
+              value={stats.totalEmails.toLocaleString()}
+              label="total emails"
+              color={STRIP_COLORS.totalEmails}
+            />
+            <StripItem
+              value={`${stats.percentageUnread}%`}
+              label="unread"
+              color={STRIP_COLORS.percentageUnread}
+            />
+            <StripItem
+              value={stats.cleanedUp}
+              label="cleaned up"
+              color={STRIP_COLORS.cleanedUp}
+            />
+            <StripItem
+              value={stats.averageEmailsPerDay}
+              label="average emails per day "
+              color={STRIP_COLORS.averageEmailsPerDay}
+            />
+            <StripItem
+              value={`${stats.oldestUnreadDays}d`}
+              label="oldest unread"
+              color={STRIP_COLORS.oldestUnreadDays}
+              last
+            />
+          </div>
+
+          {/* DONUT ROW */}
+          <div className="grid grid-cols-3 gap-6 items-start">
+
+            <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Email categories</h3>
+                <span className="text-sm text-gray-500">
+                  {stats.totalEmails.toLocaleString()} total
+                </span>
+              </div>
+              <div className="flex items-center gap-7">
+                <Donut segments={categorySegments} radius={CATEGORY_RADIUS} size={180} />
+                <div className="flex-1 flex flex-col gap-3">
+                  {categorySegments.map((s) => (
+                    <div key={s.key} className="flex items-center gap-2.5 text-sm">
+                      <span className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${s.dot}`} />
+                      <span className="flex-1 font-medium text-gray-700">{s.name}</span>
+                      <span className="text-xs text-gray-400 w-9 text-right">{s.count}</span>
+                      <span className="font-semibold text-gray-900">{s.pct}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Read vs unread</h3>
+                <span className="text-sm text-gray-500">this month</span>
+              </div>
+              <div className="flex items-center gap-7">
+                <div className="relative">
+                  <Donut segments={readUnreadSegments} radius={READ_UNREAD_RADIUS} size={140} />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xl font-bold text-gray-900">
+                      {stats.percentageUnread}%
+                    </span>
+                    <span className="text-[10px] font-medium text-gray-400">UNREAD</span>
+                  </div>
+                </div>
+                <div className="flex-1 flex flex-col gap-3">
+                  {readUnreadSegments.map((s) => (
+                    <div key={s.key} className="flex items-center gap-2.5 text-sm">
+                      <span className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${s.dot}`} />
+                      <span className="flex-1 font-medium text-gray-700">{s.name}</span>
+                      <span className="font-semibold text-gray-900">{s.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- small pieces ---------- */
+
+function StripItem({ value, label, last, color }) {
+  return (
+    <div className={`flex-1 px-5 py-4 ${last ? "" : "border-r border-gray-200"}`}>
+      <div className={`text-xl font-bold ${color || "text-gray-900"}`}>{value}</div>
+      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function Donut({ segments, radius, size }) {
+  const center = size / 2;
+  const strokeWidth = radius > 60 ? 22 : 20;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <g transform={`rotate(-90 ${center} ${center})`}>
+        <circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke="#F0F1F4"
+          strokeWidth={strokeWidth}
+        />
+        {segments.map((s) => (
+          <circle
+            key={s.key}
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            className={s.stroke}
+            strokeWidth={strokeWidth}
+            strokeDasharray={s.dasharray}
+            strokeDashoffset={s.dashoffset}
+          />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+export default InboxStats;

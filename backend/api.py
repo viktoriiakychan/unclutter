@@ -2,7 +2,7 @@ from flask import Flask, jsonify
 from dataclasses import asdict
 from flask_cors import CORS
 from gmail_client import GmailClient
-from analytics import get_suggestions
+from analytics import get_suggestions, get_total_email_count, get_unread_stats, get_category_breakdown, get_oldest_unread_days, get_cleaned_up_count, get_avg_emails_per_day
 
 from flask import request
 
@@ -146,6 +146,22 @@ def unarchive_emails():
 
     return jsonify({"unarchived": len(ids)})
 
+@app.route("/stats")
+def get_stats():
+    conn = database.get_connection()
+    unread_stats = get_unread_stats(conn)
+
+    return jsonify({
+        "totalEmails": get_total_email_count(conn),
+        "unread": unread_stats["unread"],
+        "read": unread_stats["read"],
+        "percentageUnread": unread_stats["percentageUnread"],
+        "percentageRead": unread_stats["percentageRead"],
+        "cleanedUp": get_cleaned_up_count(conn),
+        "categoriesStats": get_category_breakdown(conn),
+        "oldestUnreadDays": get_oldest_unread_days(conn),
+        "averageEmailsPerDay": get_avg_emails_per_day(conn, 30),
+    })
 
 
 if __name__ == "__main__":
