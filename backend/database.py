@@ -73,24 +73,28 @@ def save_emails(emails):
 
     for email in emails:
         cursor.execute("""
-           INSERT OR REPLACE INTO emails
+            INSERT INTO emails
             (id, thread_id, sender_name, sender_email, subject, date,
              unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                thread_id=excluded.thread_id,
+                sender_name=excluded.sender_name,
+                sender_email=excluded.sender_email,
+                subject=excluded.subject,
+                date=excluded.date,
+                unread=excluded.unread,
+                category=excluded.category,
+                attachment_count=excluded.attachment_count,
+                attachment_size=excluded.attachment_size,
+                is_newsletter=excluded.is_newsletter,
+                unsubscribe=excluded.unsubscribe,
+                internal_date=excluded.internal_date
         """, (
-            email.id,
-            email.thread_id,
-            email.sender_name,
-            email.sender_email,
-            email.subject,
-            email.date,
-            1 if email.unread else 0,
-            email.category,
-            email.attachment_count,
-            email.attachment_size,
-            1 if email.is_newsletter else 0,
-            email.unsubscribe,
-            email.internal_date
+            email.id, email.thread_id, email.sender_name, email.sender_email,
+            email.subject, email.date, 1 if email.unread else 0, email.category,
+            email.attachment_count, email.attachment_size,
+            1 if email.is_newsletter else 0, email.unsubscribe, email.internal_date
         ))
 
     conn.commit()

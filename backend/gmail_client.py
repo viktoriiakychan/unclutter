@@ -127,25 +127,23 @@ class GmailClient:
             full_messages[request_id] = response
 
         # send in smaller chunks 
-        for i in range(0, len(messages), 5):
-            chunk = messages[i:i+5]
+        for i in range(0, len(messages), 25):   # was 5
+            chunk = messages[i:i+25]
 
-            # create an empty batch 
             batch = self.service.new_batch_http_request(
-                callback=handle_response # the results come back through here
+                callback=handle_response
             )
 
-            # loops over 5 emails and adds the get request in the batch
             for message in chunk:
                 batch.add(
                     self.service.users().messages().get(
                         userId="me",
                         id=message["id"]    
                     ),
-                    request_id= message["id"]
+                    request_id=message["id"]
                 )
-            batch.execute() # sends the batch to gmail to execute 
-            time.sleep(0.2)
+            batch.execute()
+            time.sleep(0.1)
 
         emails = []
 
@@ -331,3 +329,13 @@ class GmailClient:
                 })
 
         return result
+
+    def get_recent_emails(self, limit=100):
+        results = self.service.users().messages().list(
+            userId="me",
+            maxResults=limit
+        ).execute()
+        messages = results.get("messages", [])
+        if not messages:
+            return []
+        return self._fetch_full(messages)

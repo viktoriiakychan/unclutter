@@ -69,9 +69,18 @@ function Sidebar() {
           </p>
 
           <div className="space-y-1">
-            <a className="flex items-center text-sm px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
+            <NavLink
+                to="/inbox-stats"
+                className={({ isActive }) =>
+                  `flex text-sm items-center px-3 py-2 rounded-lg ${
+                    isActive
+                      ? "bg-blue-600 text-white  font-medium"
+                      : "text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  }`
+                }
+                >
               Inbox Stats
-            </a>
+            </NavLink>
             <a className="flex items-center text-sm px-3 py-2 rounded-lg text-gray-700 dark:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700">
               Top Senders
             </a>

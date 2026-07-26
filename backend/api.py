@@ -45,15 +45,8 @@ def sync():
         return jsonify({"error": "not_logged_in"}), 401
     client.connect()
 
-    existing = database.get_existing_ids()
-
-    if not existing:
-        emails = client.get_emails()
-    else:
-        emails = client.get_new_emails(existing)
-
-    database.create_table()
-    database.save_emails(emails)        # ← fixed: emails, not new_emails
+    emails = client.get_recent_emails()
+    database.save_emails(emails)
     return jsonify({"synced": len(emails)})
 
 @app.route("/auth/me")

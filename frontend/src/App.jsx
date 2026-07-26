@@ -39,17 +39,11 @@ function App() {
 
   // one function, used for both the 30s poll and delete-checking
   async function refetchEmails() {
-    if (isRefreshing.current) return emails; // skip overlapping calls
-    isRefreshing.current = true;
-    try {
-      await fetch(`${API}/sync`, { method: "POST" });
-      const res = await fetch(`${API}/emails`);
-      const fresh = await res.json();
-      setEmails(fresh);
-      return fresh;
-    } finally {
-      isRefreshing.current = false;
-    }
+    await fetch(`${API}/sync`, { method: "POST" });
+    const res = await fetch(`${API}/emails`);
+    const data = await res.json();
+    setEmails(data);
+    return data;
   }
 
   async function checkLogin() {
