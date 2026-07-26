@@ -2,7 +2,7 @@ from collections import Counter
 import math
 import time
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 def get_unread_emails(emails):
     count = 0
@@ -132,36 +132,60 @@ def get_suggestions(emails):
     ]
     return [r for r in results if r is not None]
 
-def get_total_email_count(conn):
-    return conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0]  
+def _cutoff_ms(days):
+    return int((datetime.now(timezone.utc).timestamp() - days * 86400) * 1000)
 
-def get_unread_stats(conn):
-    total = get_total_email_count(conn)
-    unread = conn.execute("SELECT COUNT(*) FROM emails WHERE unread = 1").fetchone()[0]
+def get_total_email_count(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+    return conn.execute(
+        "SELECT COUNT(*) FROM emails WHERE internal_date >= ?", (cutoff_ms,)
+    ).fetchone()[0]
+
+def get_unread_stats(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+    total = get_total_email_count(conn, days)
+    unread = conn.execute(
+        "SELECT COUNT(*) FROM emails WHERE unread = 1 AND internal_date >= ?", (cutoff_ms,)
+    ).fetchone()[0]
     read = total - unread
+
+    if total == 0:
+        return {"unread": 0, "read": 0, "percentageUnread": 0, "percentageRead": 0}
+
     return {
         "unread": unread,
         "read": read,
         "percentageUnread": round(unread / total * 100),
-        "percentageRead": round(read / total * 100)
+        "percentageRead": round(read / total * 100),
     }
 
-def get_category_breakdown(conn):
-    rows = conn.execute("SELECT category, COUNT(*) FROM emails GROUP BY category").fetchall()
+def get_category_breakdown(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+    rows = conn.execute(
+        "SELECT category, COUNT(*) FROM emails WHERE internal_date >= ? GROUP BY category",
+        (cutoff_ms,)
+    ).fetchall()
     return [{"name": r[0], "count": r[1]} for r in rows]
 
-def get_oldest_unread_days(conn):
-    row = conn.execute("SELECT MIN(internal_date) FROM emails WHERE unread = 1").fetchone()
+def get_oldest_unread_days(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+    row = conn.execute(
+        "SELECT MIN(internal_date) FROM emails WHERE unread = 1 AND internal_date >= ?",
+        (cutoff_ms,)
+    ).fetchone()
     oldest_date = row[0]
 
     if oldest_date is None:
-        return None  # no unread emails
+        return None
 
     oldest_dt = datetime.fromtimestamp(int(oldest_date) / 1000, tz=timezone.utc)
     return (datetime.now(timezone.utc) - oldest_dt).days
 
-def get_cleaned_up_count(conn):
-    return conn.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0]
+def get_cleaned_up_count(conn, days=30):
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    return conn.execute(
+        "SELECT COUNT(*) FROM activity_log WHERE timestamp >= ?", (cutoff,)
+    ).fetchone()[0]
 
 def get_avg_emails_per_day(conn, days=30):
     cutoff_ms = int((datetime.now(timezone.utc).timestamp() - days * 86400) * 1000)

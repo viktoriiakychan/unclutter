@@ -66,9 +66,17 @@ const STRIP_COLORS = {
   oldestUnreadDays: "text-red-500",
 };
 
+const RANGE_OPTIONS = [
+  { label: "7 days", days: 7 },
+  { label: "30 days", days: 30 },
+  { label: "90 days", days: 90 },
+  { label: "180 days", days: 180 },
+];
+
 function InboxStats() {
   const [userEmail, setUserEmail] = useState("");
   const [stats, setStats] = useState(null);
+  const [rangeDays, setRangeDays] = useState(30);
 
   useEffect(() => {
     fetch(`${API}/auth/me`)
@@ -77,10 +85,10 @@ function InboxStats() {
   }, []);
 
   useEffect(() => {
-    fetch(`${API}/stats`)
+    fetch(`${API}/stats?days=${rangeDays}`)
       .then((r) => r.json())
       .then((data) => setStats(data));
-  }, []);
+  }, [rangeDays]);
 
   if (!userEmail || !stats) {
     return <CenterMessage text="Loading your stats..." />;
@@ -125,18 +133,19 @@ function InboxStats() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {["7 days", "30 days", "90 days"].map((label) => (
+              {RANGE_OPTIONS.map((opt) => (
                 <button
-                  key={label}
-                  className={`text-[10px] px-3 py-1 rounded-full font-medium border ${
-                    label === "30 days"
-                      ? "bg-green-100 text-green-700 border-green-500"
-                      : "text-gray-700 border-gray-300 hover:bg-gray-100"
-                  }`}
+                    key={opt.days}
+                    onClick={() => setRangeDays(opt.days)}
+                    className={`text-[10px] px-3 py-1 rounded-full font-medium border ${
+                    rangeDays === opt.days
+                        ? "bg-green-100 text-green-700 border-green-500"
+                        : "text-gray-700 border-gray-300 hover:bg-gray-100"
+                    }`}
                 >
-                  {label}
+                    {opt.label}
                 </button>
-              ))}
+                ))}
             </div>
           </div>
 

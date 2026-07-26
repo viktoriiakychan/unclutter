@@ -141,21 +141,22 @@ def unarchive_emails():
 
 @app.route("/stats")
 def get_stats():
+    days = request.args.get("days", 30, type=int)
+    
     conn = database.get_connection()
     unread_stats = get_unread_stats(conn)
 
     return jsonify({
-        "totalEmails": get_total_email_count(conn),
+        "totalEmails": get_total_email_count(conn, days),
         "unread": unread_stats["unread"],
         "read": unread_stats["read"],
         "percentageUnread": unread_stats["percentageUnread"],
         "percentageRead": unread_stats["percentageRead"],
-        "cleanedUp": get_cleaned_up_count(conn),
-        "categoriesStats": get_category_breakdown(conn),
-        "oldestUnreadDays": get_oldest_unread_days(conn),
-        "averageEmailsPerDay": get_avg_emails_per_day(conn, 30),
+        "cleanedUp": get_cleaned_up_count(conn, days),
+        "categoriesStats": get_category_breakdown(conn, days),
+        "oldestUnreadDays": get_oldest_unread_days(conn, days),
+        "averageEmailsPerDay": get_avg_emails_per_day(conn, days),
     })
-
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
