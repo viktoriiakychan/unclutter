@@ -3,6 +3,9 @@ import math
 import time
 
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo("Europe/Dublin")
 
 def get_unread_emails(emails):
     count = 0
@@ -208,3 +211,29 @@ def get_avg_emails_per_day(conn, days=30):
     return round(sum(counts.values()) / len(counts))
 
 
+def get_email_heatmap(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+    rows = conn.execute(
+        "SELECT internal_date FROM emails WHERE internal_date >= ?",
+        (cutoff_ms,)
+    ).fetchall()
+
+    counts = {}
+
+    for day in range(7):
+        for hour in range(24):
+            counts[(day, hour)] = 0
+    
+    for row in rows:
+        dt_utc = datetime.fromtimestamp(int(row[0]) / 1000, tz=timezone.utc)
+        dt_local = dt_utc.astimezone(LOCAL_TZ)
+
+        key = (dt_local.weekday(), dt_local.hour)
+        counts[key] = counts.get(key, 0) + 1
+
+    result = []
+    for day in range(7):
+        for hour in range(24):
+            result.append({"day": day, "hour": hour, "count": counts[(day, hour)]})
+
+    return result

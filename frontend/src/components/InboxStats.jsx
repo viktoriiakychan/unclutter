@@ -1,15 +1,11 @@
 import { useState, useEffect } from "react";
 
 import Sidebar from "./Sidebar";
+import Heatmap from "./Heatmap";
 import Header from "./Header";
 import CenterMessage from "./CenterMessage";
 
 import { API } from "../utils/constants";
-
-/* ---------- category display + color lookup ----------
-   Keyed by the raw lowercase strings your backend actually returns
-   (promotions, updates, social, forums, other). Static, so it stays
-   at module scope — it never changes at runtime. */
 
 const CATEGORY_STYLES = {
   promotions: { dot: "bg-yellow-500", stroke: "text-yellow-500" },
@@ -30,9 +26,6 @@ function toDisplayName(category) {
   return safe.charAt(0).toUpperCase() + safe.slice(1);
 }
 
-/* ---------- donut math ---------- */
-// Turns a list of {count} objects into stroke-dasharray/offset values
-// for stacked <circle> segments. Reused for both donuts below.
 function buildDonutSegments(data, radius) {
   const total = data.reduce((sum, d) => sum + d.count, 0);
   if (total === 0) return [];
@@ -71,6 +64,25 @@ const RANGE_OPTIONS = [
   { label: "90 days", days: 90 },
   { label: "180 days", days: 180 },
 ];
+
+function formatHour(hour){
+    if (hour === 0) return "12am";
+    if (hour === 12) return "12pm";
+    if (hour < 12) return `${hour}am`;
+    return `${hour - 12}pm`;
+}
+
+function getHeatColor(count, maxCount) {
+    if (count === 0) return "bg-gray-100";
+
+    const fraction = count / maxCount;
+
+    if (fraction <= 0.2) return "bg-blue-200";
+    if (fraction <= 0.4) return "bg-blue-400";
+    if (fraction <= 0.7) return "bg-blue-600";
+    return "bg-blue-800";
+}
+
 
 function InboxStats() {
   const [userEmail, setUserEmail] = useState("");
@@ -230,7 +242,11 @@ function InboxStats() {
               </div>
             </div>
 
+
           </div>
+            <div className="mt-6">
+                <Heatmap cells={stats.heatmap} days={rangeDays}/>
+            </div>
 
         </main>
       </div>
