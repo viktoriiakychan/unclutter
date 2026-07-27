@@ -6,6 +6,7 @@ import Header from "./Header";
 import CenterMessage from "./CenterMessage";
 
 import { API } from "../utils/constants";
+import EmailVolumeChart from "./EmailVolumeChart";
 
 const CATEGORY_STYLES = {
   promotions: { dot: "bg-yellow-500", stroke: "text-yellow-500" },
@@ -104,7 +105,6 @@ function InboxStats() {
   if (!userEmail || !stats) {
     return <CenterMessage text="Loading your stats..." />;
   }
-
 
   const categoryData = stats.categoriesStats.map((c) => {
     const key = c.name ?? "other";
@@ -246,6 +246,10 @@ function InboxStats() {
           </div>
             <div className="mt-6">
                 <Heatmap cells={stats.heatmap} days={rangeDays}/>
+            </div>
+
+            <div className="mt-6">
+                  <EmailVolumeChart data={stats.emailVolume} days = {rangeDays} />
             </div>
 
         </main>

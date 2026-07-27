@@ -5,6 +5,8 @@ import time
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
+from collections import Counter
+
 LOCAL_TZ = ZoneInfo("Europe/Dublin")
 
 def get_unread_emails(emails):
@@ -237,3 +239,26 @@ def get_email_heatmap(conn, days=30):
             result.append({"day": day, "hour": hour, "count": counts[(day, hour)]})
 
     return result
+
+def email_volume_stats(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+    rows = conn.execute(
+        "SELECT internal_date FROM emails WHERE internal_date >= ?",
+        (cutoff_ms,)
+    ).fetchall()
+
+    today = datetime.now(LOCAL_TZ).date()
+    daily_counts = {}
+
+    for i in range(days - 1, -1, -1): # start stop step 
+        d = (today - timedelta(days=i)).isoformat() 
+        daily_counts[d] = 0
+
+    for row in rows:
+        dt_utc = datetime.fromtimestamp(int(row[0]) / 1000, tz=timezone.utc)
+        dt_local = dt_utc.astimezone(LOCAL_TZ)
+        daily_counts[dt_local.date().isoformat()] += 1
+
+    result = [{"date": d, "count": c} for d, c in sorted(daily_counts.items())]
+    return result
+

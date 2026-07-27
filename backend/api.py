@@ -2,7 +2,7 @@ from flask import Flask, jsonify
 from dataclasses import asdict
 from flask_cors import CORS
 from gmail_client import GmailClient
-from analytics import get_suggestions, get_total_email_count, get_unread_stats, get_category_breakdown, get_oldest_unread_days, get_cleaned_up_count, get_avg_emails_per_day, get_email_heatmap
+from analytics import get_suggestions, get_total_email_count, get_unread_stats, get_category_breakdown, get_oldest_unread_days, get_cleaned_up_count, get_avg_emails_per_day, get_email_heatmap, email_volume_stats
 
 from flask import request
 
@@ -156,7 +156,8 @@ def get_stats():
         "categoriesStats": get_category_breakdown(conn, days),
         "oldestUnreadDays": get_oldest_unread_days(conn, days),
         "averageEmailsPerDay": get_avg_emails_per_day(conn, days),
-        "heatmap": get_email_heatmap(conn,days)
+        "heatmap": get_email_heatmap(conn,days),
+        "emailVolume": email_volume_stats(conn,days),
     })
 
 if __name__ == "__main__":
