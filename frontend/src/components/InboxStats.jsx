@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 
 import Sidebar from "./Sidebar";
+import StatCard from "./StatCard";
 import Heatmap from "./Heatmap";
 import Header from "./Header";
 import CenterMessage from "./CenterMessage";
@@ -125,6 +126,13 @@ function InboxStats() {
 
   const categorySegments = buildDonutSegments(categoryData, CATEGORY_RADIUS);
   const readUnreadSegments = buildDonutSegments(readUnreadData, READ_UNREAD_RADIUS);
+
+  function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+  }
 
   return (
     <div className="h-screen flex bg-gray-50 text-gray-800 overflow-hidden">
@@ -251,6 +259,31 @@ function InboxStats() {
             <div className="mt-6">
                   <EmailVolumeChart data={stats.emailVolume} days = {rangeDays} />
             </div>
+
+           <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-5 mt-6">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900">Attachments</h3>
+            </div>
+
+            <div className="flex gap-7 mb-6">
+                <StatCard value={stats.emailsWithAttachment} label="emails with attachments" color="text-blue-500" />
+                <StatCard value={formatBytes(stats.totalAttachmentSize)} label="attachment space" color="text-blue-500" />
+            </div>
+
+            <div className="divide-y divide-gray-100">
+              
+              {stats.largestAttachments.map((a) =>
+                <div className="flex items-center justify-between py-3">
+                    <div>
+                        <div className="text-sm font-medium text-gray-900">{a.sender_name}</div>
+                        <div className="text-xs text-gray-500">{a.subject}</div>
+                    </div>
+                    <div className="text-sm font-semibold text-purple-600">{formatBytes(a.attachment_size)}</div>
+                </div>
+              )}
+                
+            </div>
+</div>
 
         </main>
       </div>

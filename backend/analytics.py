@@ -262,3 +262,37 @@ def email_volume_stats(conn, days=30):
     result = [{"date": d, "count": c} for d, c in sorted(daily_counts.items())]
     return result
 
+
+def get_num_emails_with_attachment(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+    return conn.execute(
+        "SELECT COUNT(*) FROM emails WHERE internal_date >= ? AND attachment_count >= 1", (cutoff_ms,)
+    ).fetchone()[0]
+
+def get_total_attachment_size(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+
+    return conn.execute("SELECT SUM(attachment_size) FROM emails WHERE internal_date >= ?", (cutoff_ms,)).fetchone()[0] or 0    
+
+def get_largest_attachment_list(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+
+    rows = conn.execute("""
+        SELECT id, sender_name, sender_email, subject, attachment_size, attachment_count
+        FROM emails 
+        WHERE internal_date >= ? AND attachment_count >= 1
+        ORDER BY attachment_size DESC
+        LIMIT 10
+    """, (cutoff_ms,)).fetchall()
+
+    return [
+        {
+            "id": row[0],
+            "sender_name": row[1],
+            "sender_email": row[2],
+            "subject": row[3],
+            "attachment_size": row[4],
+            "attachment_count": row[5],
+        }
+        for row in rows
+    ]
