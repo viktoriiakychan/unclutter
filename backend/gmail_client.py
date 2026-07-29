@@ -339,3 +339,29 @@ class GmailClient:
         if not messages:
             return []
         return self._fetch_full(messages)
+    
+    def _collect_attachments(self, parts, email_id, conn):
+        if not parts:
+            return
+
+        for part in parts:
+            filename = part.get("filename")
+            if filename:
+                mime_type = part.get("mimeType", "")
+                size = part.get("body", {}).get("size", 0)
+                conn.execute(
+                    "INSERT OR IGNORE INTO attachments (email_id, filename, mime_type, size_bytes) VALUES (?, ?, ?, ?)",
+                    (email_id, filename, mime_type, size)
+                )
+
+            self._collect_attachments(part.get("parts", []), email_id, conn)
+
+    def sync_attachments(self, conn, email_id):
+        msg = self.service.users().messages().get(
+            userId="me", id=email_id, format="full"
+        ).execute()
+
+        payload = msg.get("payload", {})
+        self._collect_attachments(payload.get("parts", []), email_id, conn)
+
+        conn.commit()

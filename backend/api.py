@@ -2,7 +2,7 @@ from flask import Flask, jsonify
 from dataclasses import asdict
 from flask_cors import CORS
 from gmail_client import GmailClient
-from analytics import get_suggestions, get_total_email_count, get_unread_stats, get_category_breakdown, get_oldest_unread_days, get_cleaned_up_count, get_avg_emails_per_day, get_email_heatmap, email_volume_stats, get_num_emails_with_attachment, get_total_attachment_size, get_largest_attachment_list
+from analytics import get_suggestions, get_total_email_count, get_unread_stats, get_category_breakdown, get_oldest_unread_days, get_cleaned_up_count, get_avg_emails_per_day, get_email_heatmap, email_volume_stats, get_num_emails_with_attachment, get_total_attachment_size, get_largest_attachment_list, get_attachment_type_breakdown
 
 from flask import request
 
@@ -47,6 +47,13 @@ def sync():
 
     emails = client.get_recent_emails()
     database.save_emails(emails)
+
+    conn = database.get_connection()
+    for email in emails:
+        if email.attachment_count >= 1:
+            client.sync_attachments(conn, email.id)
+    conn.close()
+
     return jsonify({"synced": len(emails)})
 
 @app.route("/auth/me")
@@ -160,7 +167,8 @@ def get_stats():
         "emailVolume": email_volume_stats(conn,days),
         "emailsWithAttachment": get_num_emails_with_attachment(conn, days),
         "totalAttachmentSize": get_total_attachment_size(conn, days),
-        "largestAttachments": get_largest_attachment_list(conn, days)
+        "largestAttachments": get_largest_attachment_list(conn, days),
+        "attachmentBreakdown": get_attachment_type_breakdown(conn, days)
     })
 
 if __name__ == "__main__":

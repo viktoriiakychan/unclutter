@@ -296,3 +296,33 @@ def get_largest_attachment_list(conn, days=30):
         }
         for row in rows
     ]
+
+def _categorize_mime(mime_type):
+    if "pdf" in mime_type:
+        return "PDF"
+    elif "image" in mime_type:
+        return "Image"
+    elif "word" in mime_type or "document" in mime_type:
+        return "Doc"
+    elif "sheet" in mime_type or "excel" in mime_type:
+        return "Spreadsheet"
+    elif "zip" in mime_type or "compressed" in mime_type:
+        return "Archive"
+    else:
+        return "Other"
+
+def get_attachment_type_breakdown(conn, days=30):
+    cutoff_ms = _cutoff_ms(days)
+    rows = conn.execute("""
+        SELECT a.mime_type 
+        FROM attachments a
+        JOIN emails e ON a.email_id = e.id
+        WHERE e.internal_date >= ?
+    """, (cutoff_ms,)).fetchall()
+    
+    counts = {}
+    for row in rows:
+        category = _categorize_mime(row[0] or "")
+        counts[category] = counts.get(category, 0) + 1
+    
+    return counts

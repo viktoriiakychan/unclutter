@@ -29,6 +29,18 @@ def create_table():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attachments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email_id TEXT NOT NULL,
+            filename TEXT,
+            mime_type TEXT,
+            size_bytes INTEGER,
+            FOREIGN KEY (email_id) REFERENCES emails(id),
+            UNIQUE(email_id, filename)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
