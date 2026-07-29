@@ -268,6 +268,12 @@ class GmailClient:
                 id=email_id
             ).execute()
 
+            self.service.users().messages().modify(
+                userId="me",
+                id=email_id,
+                body={"addLabelIds": ["INBOX"]}
+            ).execute()
+
         print(f"Moved {len(email_ids)} emails from Trash.")
 
     def unarchive(self, email_ids):

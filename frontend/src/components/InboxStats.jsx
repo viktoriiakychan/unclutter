@@ -85,6 +85,14 @@ function getHeatColor(count, maxCount) {
     return "bg-blue-800";
 }
 
+const TYPE_STYLES = {
+  PDF: { dot: "bg-red-500", stroke: "text-red-500" },
+  Image: { dot: "bg-blue-500", stroke: "text-blue-500" },
+  Doc: { dot: "bg-green-500", stroke: "text-green-500" },
+  Spreadsheet: { dot: "bg-amber-500", stroke: "text-amber-500" },
+  Archive: { dot: "bg-purple-500", stroke: "text-purple-500" },
+  Other: { dot: "bg-gray-400", stroke: "text-gray-400" },
+};
 
 function InboxStats() {
   const [userEmail, setUserEmail] = useState("");
@@ -133,6 +141,13 @@ function InboxStats() {
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
   }
+
+  const attachmentTypeData = Object.entries(stats.attachmentBreakdown).map(([type, count]) => {
+  const style = TYPE_STYLES[type] ?? FALLBACK_STYLE;
+  return { key: type, name: type, count, dot: style.dot, stroke: style.stroke };
+});
+
+const attachmentTypeSegments = buildDonutSegments(attachmentTypeData, 70);
 
   return (
     <div className="h-screen flex bg-gray-50 text-gray-800 overflow-hidden">
@@ -260,30 +275,56 @@ function InboxStats() {
                   <EmailVolumeChart data={stats.emailVolume} days = {rangeDays} />
             </div>
 
-           <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-5 mt-6">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">Attachments</h3>
-            </div>
+          <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-5 mt-6">
+              <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900">Attachments</h3>
+              </div>
 
-            <div className="flex gap-7 mb-6">
-                <StatCard value={stats.emailsWithAttachment} label="emails with attachments" color="text-blue-500" />
-                <StatCard value={formatBytes(stats.totalAttachmentSize)} label="attachment space" color="text-blue-500" />
-            </div>
+              <div className="flex items-start gap-6 mb-6">
+                  <div className="flex-1 flex gap-4">
+                      <div className="flex-1">
+                          <StatCard value={stats.emailsWithAttachment} label="emails with attachments" color="text-blue-500" />
+                      </div>
+                      <div className="flex-1">
+                          <StatCard value={formatBytes(stats.totalAttachmentSize)} label="attachment space" color="text-blue-500" />
+                      </div>
+                      <div className="flex-1">
+                          <StatCard 
+                              value={formatBytes(stats.totalAttachmentSize / stats.emailsWithAttachment)} 
+                              label="average attachment size" 
+                              color="text-blue-500" 
+                          />
+                      </div>
+                  </div>
 
-            <div className="divide-y divide-gray-100">
-              
-              {stats.largestAttachments.map((a) =>
-                <div className="flex items-center justify-between py-3">
-                    <div>
-                        <div className="text-sm font-medium text-gray-900">{a.sender_name}</div>
-                        <div className="text-xs text-gray-500">{a.subject}</div>
-                    </div>
-                    <div className="text-sm font-semibold text-purple-600">{formatBytes(a.attachment_size)}</div>
-                </div>
-              )}
-                
-            </div>
-</div>
+                  <div className="flex items-center gap-6 flex-shrink-0">
+                      <Donut segments={attachmentTypeSegments} radius={50} size={130} />
+                      <div className="flex flex-col gap-2">
+                          {attachmentTypeSegments.map((s) => (
+                              <div key={s.key} className="flex items-center gap-2 text-sm">
+                                  <span className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${s.dot}`} />
+                                  <span className="font-medium text-gray-700">{s.name}</span>
+                                  <span className="text-xs text-gray-400">{s.count}</span>
+                                  <span className="font-semibold text-gray-900">{s.pct}%</span>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Largest Attachments</h4>
+              <div className="divide-y divide-gray-100">
+                  {stats.largestAttachments.map((a, i) => (
+                      <div key={i} className="flex items-center justify-between py-3">
+                          <div>
+                              <div className="text-sm font-medium text-gray-900">{a.filename}</div>
+                              <div className="text-xs text-gray-500">{a.sender_name} · {a.subject}</div>
+                          </div>
+                          <div className="text-sm font-semibold text-purple-600">{formatBytes(a.size_bytes)}</div>
+                      </div>
+                  ))}
+              </div>  
+          </div>
 
         </main>
       </div>
