@@ -278,21 +278,21 @@ def get_largest_attachment_list(conn, days=30):
     cutoff_ms = _cutoff_ms(days)
 
     rows = conn.execute("""
-        SELECT id, sender_name, sender_email, subject, attachment_size, attachment_count
-        FROM emails 
-        WHERE internal_date >= ? AND attachment_count >= 1
-        ORDER BY attachment_size DESC
+        SELECT a.filename, a.size_bytes, a.mime_type, e.sender_name, e.subject
+        FROM attachments a
+        JOIN emails e ON a.email_id = e.id
+        WHERE e.internal_date >= ?
+        ORDER BY a.size_bytes DESC
         LIMIT 10
     """, (cutoff_ms,)).fetchall()
 
     return [
         {
-            "id": row[0],
-            "sender_name": row[1],
-            "sender_email": row[2],
-            "subject": row[3],
-            "attachment_size": row[4],
-            "attachment_count": row[5],
+            "filename": row[0],
+            "size_bytes": row[1],
+            "mime_type": row[2],
+            "sender_name": row[3],
+            "subject": row[4],
         }
         for row in rows
     ]
