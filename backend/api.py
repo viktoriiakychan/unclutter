@@ -2,7 +2,7 @@ from flask import Flask, jsonify
 from dataclasses import asdict
 from flask_cors import CORS
 from gmail_client import GmailClient
-from analytics import get_suggestions, get_total_email_count, get_unread_stats, get_category_breakdown, get_oldest_unread_days, get_cleaned_up_count, get_avg_emails_per_day, get_email_heatmap, email_volume_stats, get_num_emails_with_attachment, get_total_attachment_size, get_largest_attachment_list, get_attachment_type_breakdown
+import analytics as an
 
 from flask import request
 
@@ -104,13 +104,13 @@ def archive_emails():
 # @app.route("/suggestions/top-offender")
 # def top_offender():
 #     emails = database.load_emails()
-#     result = get_top_offender(emails)
+#     result = an.get_top_offender(emails)
 #     return jsonify(result)
 
 @app.route("/suggestions")
 def suggestions():
     emails = database.load_emails()
-    return jsonify(get_suggestions(emails))
+    return jsonify(an.get_suggestions(emails))
 
 @app.route("/activity")
 def activity():
@@ -151,25 +151,40 @@ def get_stats():
     days = request.args.get("days", 30, type=int)
     
     conn = database.get_connection()
-    unread_stats = get_unread_stats(conn)
+    unread_stats = an.get_unread_stats(conn, days)
 
     return jsonify({
-        "totalEmails": get_total_email_count(conn, days),
+        "totalEmails": an.get_total_email_count(conn, days),
         "unread": unread_stats["unread"],
         "read": unread_stats["read"],
         "percentageUnread": unread_stats["percentageUnread"],
         "percentageRead": unread_stats["percentageRead"],
-        "cleanedUp": get_cleaned_up_count(conn, days),
-        "categoriesStats": get_category_breakdown(conn, days),
-        "oldestUnreadDays": get_oldest_unread_days(conn, days),
-        "averageEmailsPerDay": get_avg_emails_per_day(conn, days),
-        "heatmap": get_email_heatmap(conn,days),
-        "emailVolume": email_volume_stats(conn,days),
-        "emailsWithAttachment": get_num_emails_with_attachment(conn, days),
-        "totalAttachmentSize": get_total_attachment_size(conn, days),
-        "largestAttachments": get_largest_attachment_list(conn, days),
-        "attachmentBreakdown": get_attachment_type_breakdown(conn, days)
+        "cleanedUp": an.get_cleaned_up_count(conn, days),
+        "categoriesStats": an.get_category_breakdown(conn, days),
+        "oldestUnreadDays": an.get_oldest_unread_days(conn, days),
+        "averageEmailsPerDay": an.get_avg_emails_per_day(conn, days),
+        "heatmap": an.get_email_heatmap(conn, days),
+        "emailVolume": an.email_volume_stats(conn, days),
+        "emailsWithAttachment": an.get_num_emails_with_attachment(conn, days),
+        "totalAttachmentSize": an.get_total_attachment_size(conn, days),
+        "largestAttachments": an.get_largest_attachment_list(conn, days),
+        "attachmentBreakdown": an.get_attachment_type_breakdown(conn, days)
     })
+
+@app.route("/noise-scores")
+def get_noise_scores():
+    conn = database.get_connection()
+
+    scores = an.get_sender_noise_scores(conn)
+    return jsonify(scores)
+
+@app.route("/health-score")
+def get_health_score():
+    conn = database.get_connection()
+    
+    scores = an.get_inbox_health_score(conn)
+    return jsonify(scores)
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

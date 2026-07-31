@@ -48,7 +48,7 @@ function Dashboard({ emails, refetchEmails }) {
         .then((data) => setUserEmail(data.email));
     }, []);
 
-        useEffect(()=> {
+    useEffect(()=> {
         fetch(`${API}/unsubscribe-list`)
         .then((r) => r.json())
         .then((data) => setUnsubscribeList(data));

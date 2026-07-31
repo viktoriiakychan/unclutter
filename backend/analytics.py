@@ -257,7 +257,9 @@ def email_volume_stats(conn, days=30):
     for row in rows:
         dt_utc = datetime.fromtimestamp(int(row[0]) / 1000, tz=timezone.utc)
         dt_local = dt_utc.astimezone(LOCAL_TZ)
-        daily_counts[dt_local.date().isoformat()] += 1
+        day_key = dt_local.date().isoformat()
+        if day_key in daily_counts:
+            daily_counts[day_key] += 1
 
     result = [{"date": d, "count": c} for d, c in sorted(daily_counts.items())]
     return result
@@ -326,3 +328,64 @@ def get_attachment_type_breakdown(conn, days=30):
         counts[category] = counts.get(category, 0) + 1
     
     return counts
+
+def get_sender_noise_scores(conn, min_emails=2):
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT sender_email,
+               MAX(sender_name) as sender_name,
+               COUNT(*) as total,
+               SUM(CASE WHEN unread = 1 THEN 1 ELSE 0 END) as unread_count
+        FROM emails
+        GROUP BY sender_email
+        HAVING COUNT(*) >= ?
+    """, (min_emails,))
+    base_rows = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT sender_email, COUNT(*) as deleted_count
+        FROM activity_log
+        WHERE action_type = 'deleted'
+        GROUP BY sender_email
+    """)
+    deleted_map = {row[0]: row[1] for row in cursor.fetchall()}
+
+    conn.close()
+
+    scored = []
+    for sender_email, sender_name, total, unread_count in base_rows:
+        deleted_count = deleted_map.get(sender_email, 0)
+        unread_rate = unread_count / total
+        deleted_rate = deleted_count / total
+
+        noise_score = round((unread_rate * 60 + deleted_rate * 40), 1)
+
+        scored.append({
+            "sender_email": sender_email,
+            "sender_name": sender_name,
+            "unread_rate": round(unread_rate * 100, 1),
+            "total_emails": total,
+            "noise_score": noise_score,
+        })
+
+    scored.sort(key=lambda x: x["noise_score"], reverse=True)
+    return scored
+
+def get_inbox_health_score(conn):
+    # unread 
+    unread_stats = get_unread_stats(conn, days=30) 
+    unread_pct = unread_stats["percentageUnread"]  # already 0-100
+    
+    # noise
+    senders = get_sender_noise_scores(conn)
+    avg_noise = sum(s["noise_score"] for s in senders) / len(senders) if senders else 0
+    
+    conn.close()
+    
+    health_score = round(100 - (unread_pct * 0.5 + avg_noise * 0.5), 1)
+    return {
+        "health_score": health_score,
+        "backlog_pct": round(unread_pct, 1),
+        "avg_noise": round(avg_noise, 1),
+    }

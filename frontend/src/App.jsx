@@ -18,6 +18,7 @@ import { API, FILTERS, CATEGORIES } from "./utils/constants";
 import { timeAgo } from "./utils/helpers";
 import Activity from "./components/ActivityLog";
 import InboxStats from "./components/InboxStats";
+import TopSenders from "./components/TopSenders";
 
 function App() {
   const [phase, setPhase] = useState("checking");
@@ -102,6 +103,7 @@ function App() {
       <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails ={refetchEmails}/>} />
       <Route path="/activity" element={<Activity refetchEmails ={refetchEmails} />} />
       <Route path="/inbox-stats" element={<InboxStats />} />
+      <Route path="/top-senders" element={<TopSenders />} />
     </Routes>
   );
 }
