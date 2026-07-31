@@ -4,8 +4,6 @@ import Header from "./Header";
 
 import { API } from "../utils/constants";
 
-
-
 const FLAGGED_THRESHOLD = 60;
 
 function StatCard_TopSenders({ icon, value, valueSuffix, label, variant }) {
@@ -78,6 +76,10 @@ export default function TopSenders() {
     const [filter, setFilter] = useState("all");
     const [healthScore, setHealthScore] = useState([]);
     const [noiseScores, setNoiseScores] = useState([]);
+    //const [flagged, setFlagged] = useState([]);
+    const [flaggedCount, setFlaggedCount] = useState(0);
+    const [unreadFromThem, setUnreadFromThem] = useState(0);
+
 
     useEffect(()=> {
         fetch(`${API}/health-score`)
@@ -88,7 +90,14 @@ export default function TopSenders() {
     useEffect(()=> {
         fetch(`${API}/noise-scores`)
         .then((r) => r.json())
-        .then((data) => setNoiseScores(data));
+        .then((data) => {
+            setNoiseScores(data);
+            //setFlagged(data.filter((s) => s.is_flagged));
+            const flaggedSenders = data.filter((s) => s.is_flagged);
+            setFlaggedCount(flaggedSenders.length);
+            const totalUnread = flaggedSenders.reduce((total, s) => total + s.unread_count, 0);
+            setUnreadFromThem(totalUnread);
+        })
     }, []);
 
   return (
@@ -106,8 +115,8 @@ export default function TopSenders() {
 
           <div className="flex gap-4 mb-5">
             <StatCard_TopSenders variant="red" icon="%" value={Math.round(healthScore)} valueSuffix="/100" label="inbox health score" />
-            <StatCard_TopSenders variant="yellow" icon="!" value={33} label="senders flagged" />
-            <StatCard_TopSenders variant="blue" icon="#" value={33} label="unread from them" />
+            <StatCard_TopSenders variant="yellow" icon="!" value={flaggedCount} label="senders flagged" />
+            <StatCard_TopSenders variant="blue" icon="#" value={unreadFromThem} label="unread from them" />
           </div>
 
           <div className="flex gap-2 mb-5">
@@ -119,7 +128,7 @@ export default function TopSenders() {
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
               <span className="text-[15px] font-semibold text-gray-900">Senders</span>
-              <span className="text-[13px] text-gray-400">{33} flagged</span>
+              <span className="text-[13px] text-gray-400">{flaggedCount} flagged</span>
             </div>
 
             {noiseScores.map((s) => (
@@ -137,7 +146,7 @@ export default function TopSenders() {
 
                     <div className="flex-1 min-w-[160px]">
                         <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                        <div className="h-full rounded-full bg-blue-500" style={{ width: `${s.noise_score}%` }} />
+                        <div className={`h-full rounded-full bg-${s.color}-500`} style={{ width: `${s.noise_score}%` }} />
                         </div>
                         <div className="text-xs text-gray-400 mt-1">noise {s.noise_score}</div>
                     </div>

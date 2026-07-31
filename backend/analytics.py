@@ -329,6 +329,16 @@ def get_attachment_type_breakdown(conn, days=30):
     
     return counts
 
+def noise_color(score):
+    if score >= 65:
+        return "red"
+    elif score >= 50:
+        return "orange"
+    elif score >= 30:
+        return "yellow"
+    else:
+        return "green"
+
 def get_sender_noise_scores(conn, min_emails=2):
     cursor = conn.cursor()
 
@@ -359,14 +369,18 @@ def get_sender_noise_scores(conn, min_emails=2):
         unread_rate = unread_count / total
         deleted_rate = deleted_count / total
 
-        noise_score = round((unread_rate * 60 + deleted_rate * 40), 1)
+        noise_score = round((unread_rate * 80 + deleted_rate * 40), 1)
+        is_flagged = True if noise_score > 70 else False 
 
         scored.append({
             "sender_email": sender_email,
             "sender_name": sender_name,
             "unread_rate": round(unread_rate * 100, 1),
+            "unread_count": unread_count,
             "total_emails": total,
             "noise_score": noise_score,
+            "is_flagged": is_flagged,
+            "color": noise_color(noise_score),
         })
 
     scored.sort(key=lambda x: x["noise_score"], reverse=True)
