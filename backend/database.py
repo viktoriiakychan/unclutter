@@ -72,6 +72,19 @@ def create_activity_table():
     conn.commit()
     conn.close()
 
+def create_dismissed_senders_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS dismissed_senders (
+            sender_email TEXT PRIMARY KEY,
+            dismissed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_seen_email_date INTEGER
+        )
+    """)
+    conn.commit()
+    conn.close()
+
 
 if __name__ == "__main__":
     create_table()

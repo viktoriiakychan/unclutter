@@ -52,12 +52,31 @@ function Dashboard({ emails, refetchEmails }) {
         fetch(`${API}/unsubscribe-list`)
         .then((r) => r.json())
         .then((data) => setUnsubscribeList(data));
-    }, []);
+    }, [emails.length]);
 
     console.log(userEmail);
 
     if (!userEmail) {
         return <CenterMessage text="Loading your inbox..." />;
+    }
+
+    async function handleUnsubscribeClick(e, sender_email, link) {
+        e.preventDefault(); // stop the <a> from navigating immediately
+
+        try {
+            await fetch(`${API}/dismiss-sender`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sender_email }),
+            });
+        } catch (err) {
+            console.error("Failed to dismiss sender:", err);
+        }
+
+        window.open(link, "_blank", "noopener,noreferrer");
+        // remove it from the visible list right away
+        setUnsubscribeList((prev) => prev.filter((item) => item.sender_email !== sender_email));
+
     }
 
     const filteredEmails = emails.filter((email) => {
@@ -523,13 +542,12 @@ function Dashboard({ emails, refetchEmails }) {
                                 {/* count + button — grouped together on the right */}
                                 <div className="flex items-center gap-3 flex-shrink-0">
                                     <span className="w-6 text-right text-xs text-gray-400">{item.count}</span>
-                                    <a
-                                    href={item.unsubscribe}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-2 py-1 rounded-lg border border-blue-400 text-blue-500 text-xs font-medium hover:bg-blue-50"
+                                    <a 
+                                        href={item.unsubscribe}
+                                        onClick={(e) => handleUnsubscribeClick(e, item.sender_email, item.unsubscribe)}
+                                        className="px-2 py-1 rounded-lg border border-blue-400 text-blue-500 text-xs font-medium hover:bg-blue-50"
                                     >
-                                    Unsubscribe
+                                        Unsubscribe
                                     </a>
                                 </div>
                                 </div>

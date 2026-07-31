@@ -71,8 +71,7 @@ function FilterTab({ label, active, onClick }) {
   );
 }
 
-
-export default function TopSenders() {
+export default function TopSenders({refetchEmails}) {
     const [filter, setFilter] = useState("all");
     const [healthScore, setHealthScore] = useState([]);
     const [noiseScores, setNoiseScores] = useState([]);
@@ -80,6 +79,24 @@ export default function TopSenders() {
     const [flaggedCount, setFlaggedCount] = useState(0);
     const [unreadFromThem, setUnreadFromThem] = useState(0);
 
+    async function handleUnsubscribeClick(e, sender_email, link) {
+        e.preventDefault(); // stop the <a> from navigating immediately
+
+        try {
+            await fetch(`${API}/dismiss-sender`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sender_email }),
+            });
+        } catch (err) {
+            console.error("Failed to dismiss sender:", err);
+        }
+
+        window.open(link, "_blank", "noopener,noreferrer");
+
+        // remove from local list immediately so the UI updates without a refetch
+        setNoiseScores((prev) => prev.filter((s) => s.sender_email !== sender_email));
+        }
 
     useEffect(()=> {
         fetch(`${API}/health-score`)
@@ -154,9 +171,17 @@ export default function TopSenders() {
                     <div className="w-[90px] text-xs text-gray-500 text-right">{s.total_emails} emails</div>
                     <div className="w-[90px] text-xs text-gray-500 text-right">{s.unread_rate}% unread</div>
 
-                    <button className="px-4 py-2 rounded-lg text-[13px] font-semibold border border-orange-300 bg-orange-100 text-orange-700 cursor-pointer whitespace-nowrap hover:bg-orange-200">
-                        Unsubscribe
-                    </button>
+                    {s.can_unsubscribe ? (
+                        <a 
+                           href={s.unsubscribe_link}
+                            onClick={(e) => handleUnsubscribeClick(e, s.sender_email, s.unsubscribe_link)}
+                            className="px-4 py-2 rounded-lg text-[13px] font-semibold border border-orange-300 bg-orange-100 text-orange-700 cursor-pointer whitespace-nowrap hover:bg-orange-200"
+                            >
+                            Unsubscribe
+                            </a>
+                        ) : (
+                        <div className="px-4 py-2 w-[105px]" />
+                        )}
                     </div>
             ))}
 

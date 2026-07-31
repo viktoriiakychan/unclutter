@@ -316,7 +316,7 @@ class GmailClient:
         return None
 
     def get_unsubscribe_links(self, limit=100):
-        emails = load_emails() 
+        emails = load_emails()
         result = []
         seen = set()
 
@@ -324,14 +324,17 @@ class GmailClient:
             if email.is_newsletter and email.sender_email not in seen:
                 seen.add(email.sender_email)
 
-                # count every email from this same sender
-                count = sum(1 for e in emails if e.sender_email == email.sender_email)
+                # count every email from this same sender + find their latest email date
+                sender_emails = [e for e in emails if e.sender_email == email.sender_email]
+                count = len(sender_emails)
+                latest_date = max(e.internal_date for e in sender_emails)
 
                 result.append({
                     "sender_name": email.sender_name,
                     "sender_email": email.sender_email,
                     "unsubscribe": self.clean_unsubscribe(email.unsubscribe),
-                    "count": count
+                    "count": count,
+                    "latest_email_date": latest_date,
                 })
 
         return result

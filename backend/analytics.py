@@ -342,11 +342,15 @@ def noise_color(score):
 def get_sender_noise_scores(conn, min_emails=2):
     cursor = conn.cursor()
 
+    dismissed_map = get_dismissed_senders(conn)
+
     cursor.execute("""
         SELECT sender_email,
                MAX(sender_name) as sender_name,
                COUNT(*) as total,
-               SUM(CASE WHEN unread = 1 THEN 1 ELSE 0 END) as unread_count
+               SUM(CASE WHEN unread = 1 THEN 1 ELSE 0 END) as unread_count,
+               MAX(CASE WHEN unsubscribe IS NOT NULL AND unsubscribe != '' THEN unsubscribe ELSE NULL END) as unsubscribe_link,
+               MAX(internal_date) as latest_email_date
         FROM emails
         GROUP BY sender_email
         HAVING COUNT(*) >= ?
@@ -364,13 +368,21 @@ def get_sender_noise_scores(conn, min_emails=2):
     conn.close()
 
     scored = []
-    for sender_email, sender_name, total, unread_count in base_rows:
+    for sender_email, sender_name, total, unread_count, unsubscribe_link, latest_email_date in base_rows:
+
+        if sender_email in dismissed_map:
+            dismissed_snapshot_date = dismissed_map[sender_email]
+            if latest_email_date <= dismissed_snapshot_date:
+                continue  # still dismissed, no new email since — skip
+
         deleted_count = deleted_map.get(sender_email, 0)
         unread_rate = unread_count / total
         deleted_rate = deleted_count / total
 
         noise_score = round((unread_rate * 80 + deleted_rate * 40), 1)
-        is_flagged = True if noise_score > 70 else False 
+        is_flagged = True if noise_score > 70 else False
+
+        clean_link = get_unsubscribe_link(unsubscribe_link)
 
         scored.append({
             "sender_email": sender_email,
@@ -381,6 +393,8 @@ def get_sender_noise_scores(conn, min_emails=2):
             "noise_score": noise_score,
             "is_flagged": is_flagged,
             "color": noise_color(noise_score),
+            "can_unsubscribe": clean_link is not None,
+            "unsubscribe_link": clean_link,
         })
 
     scored.sort(key=lambda x: x["noise_score"], reverse=True)
@@ -403,3 +417,7 @@ def get_inbox_health_score(conn):
         "backlog_pct": round(unread_pct, 1),
         "avg_noise": round(avg_noise, 1),
     }
+def get_dismissed_senders(conn):
+    cursor = conn.cursor()
+    cursor.execute("SELECT sender_email, last_seen_email_date FROM dismissed_senders")
+    return {row[0]: row[1] for row in cursor.fetchall()}

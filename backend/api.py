@@ -13,6 +13,7 @@ CORS(app)
 
 database.create_table()
 database.create_activity_table()
+database.create_dismissed_senders_table()
 
 @app.route("/emails") # when someone visits /emails run this function 
 def get_emails():
@@ -70,7 +71,22 @@ def unsubscribe_list():
     client = GmailClient()
     client.connect()
 
-    return client.get_unsubscribe_links()    
+    raw_list = client.get_unsubscribe_links()
+
+    conn = database.get_connection()
+    dismissed_map = an.get_dismissed_senders(conn)
+    conn.close()
+
+    filtered_list = []
+    for item in raw_list:
+        sender_email = item["sender_email"]
+        if sender_email in dismissed_map:
+            dismissed_snapshot_date = dismissed_map[sender_email]
+            if item["latest_email_date"] <= dismissed_snapshot_date:
+                continue  # still dismissed, nothing new since
+        filtered_list.append(item)
+
+    return jsonify(filtered_list)
 
 
 @app.route("/trash", methods=["POST"])
@@ -184,6 +200,32 @@ def get_health_score():
     
     scores = an.get_inbox_health_score(conn)
     return jsonify(scores)
+
+@app.route("/dismiss-sender", methods=["POST"])
+def dismiss_sender():
+    sender_email = request.get_json().get("sender_email")
+
+    conn = database.get_connection()
+    cursor = conn.cursor()
+
+    # find their most recent email right now
+    row = cursor.execute(
+        "SELECT MAX(internal_date) FROM emails WHERE sender_email = ?",
+        (sender_email,)
+    ).fetchone()
+    latest_date = row[0]
+
+    cursor.execute("""
+        INSERT INTO dismissed_senders (sender_email, last_seen_email_date)
+        VALUES (?, ?)
+        ON CONFLICT(sender_email) DO UPDATE SET
+            dismissed_at = CURRENT_TIMESTAMP,
+            last_seen_email_date = excluded.last_seen_email_date
+    """, (sender_email, latest_date))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"dismissed": True})
 
 
 if __name__ == "__main__":
