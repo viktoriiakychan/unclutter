@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import CenterMessage from "./CenterMessage";
+
 
 import { API } from "../utils/constants";
 
@@ -75,9 +77,10 @@ export default function TopSenders({refetchEmails}) {
     const [filter, setFilter] = useState("all");
     const [healthScore, setHealthScore] = useState([]);
     const [noiseScores, setNoiseScores] = useState([]);
-    //const [flagged, setFlagged] = useState([]);
     const [flaggedCount, setFlaggedCount] = useState(0);
     const [unreadFromThem, setUnreadFromThem] = useState(0);
+    const [userEmail, setUserEmail] = useState("");
+
 
     async function handleUnsubscribeClick(e, sender_email, link) {
         e.preventDefault(); // stop the <a> from navigating immediately
@@ -117,13 +120,25 @@ export default function TopSenders({refetchEmails}) {
         })
     }, []);
 
+    useEffect(()=> {
+        fetch(`${API}/auth/me`)
+        .then((r) => r.json())
+        .then((data) => setUserEmail(data.email));
+    }, []);
+
+    if (!userEmail ||!noiseScores) {
+        return <CenterMessage text="Loading your top senders..." />;
+    }
+
+    const visibleSenders = noiseScores.filter((s) => {
+        if (filter === "high_noise") return s.noise_score >= FLAGGED_THRESHOLD;
+        if (filter === "rarely_opened") return s.unread_rate >= 50;
+        return true;
+    });
+
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar />
-
       <div className="flex-1 flex flex-col">
-        <Header />
-
         <main className="px-10 py-8 flex-1">
           <h1 className="text-2xl font-bold text-gray-900 m-0">Top Senders</h1>
           <p className="text-sm text-gray-500 mt-1.5 mb-6">
@@ -148,8 +163,13 @@ export default function TopSenders({refetchEmails}) {
               <span className="text-[13px] text-gray-400">{flaggedCount} flagged</span>
             </div>
 
-            {noiseScores.map((s) => (
-                <div className="flex items-center gap-4 px-6 py-[18px] border-b border-gray-100">
+            {visibleSenders.map((s) => (
+                <div
+                    key={s.sender_email}
+                    className={`flex items-center gap-4 px-6 py-[18px] border-b border-gray-100 ${
+                        s.is_flagged ? "bg-yellow-50" : ""
+                    }`}
+                >
                     <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold flex-shrink-0 bg-blue-100 text-blue-500">
                         {s.sender_email ? s.sender_email[0].toUpperCase() : "?"}
                     </div>
@@ -185,7 +205,7 @@ export default function TopSenders({refetchEmails}) {
                     </div>
             ))}
 
-            {noiseScores.length === 0 && (
+            {visibleSenders.length === 0 && (
               <div className="p-10 text-center text-gray-400 text-sm">
                 No senders match this filter.
               </div>

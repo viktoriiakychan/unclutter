@@ -339,7 +339,7 @@ def noise_color(score):
     else:
         return "green"
 
-def get_sender_noise_scores(conn, min_emails=2):
+def get_sender_noise_scores(conn, min_emails=5):
     cursor = conn.cursor()
 
     dismissed_map = get_dismissed_senders(conn)
@@ -380,7 +380,7 @@ def get_sender_noise_scores(conn, min_emails=2):
         deleted_rate = deleted_count / total
 
         noise_score = round((unread_rate * 80 + deleted_rate * 40), 1)
-        is_flagged = True if noise_score > 70 else False
+        is_flagged = True if noise_score > 60 else False
 
         clean_link = get_unsubscribe_link(unsubscribe_link)
 
@@ -399,6 +399,22 @@ def get_sender_noise_scores(conn, min_emails=2):
 
     scored.sort(key=lambda x: x["noise_score"], reverse=True)
     return scored
+
+def get_worst_offender(conn, min_emails=5):
+    scores = get_sender_noise_scores(conn, min_emails)
+    if not scores:
+        return None
+
+    top = max(scores, key=lambda x: x["noise_score"])
+
+    worst = {
+        "sender_email": top["sender_email"],
+        "sender_name": top["sender_name"],
+        "unread_rate": top["unread_rate"],
+        "total_emails": top["total_emails"],
+        "noise_score": top["noise_score"],
+    }
+    return worst
 
 def get_inbox_health_score(conn):
     # unread 

@@ -13,6 +13,8 @@ import clearIcon from "./assets/close.png";
 import StatCard from "./components/StatCard";
 import CenterMessage from "./components/CenterMessage";
 import Dashboard from "./components/Dashboard";
+import Header from "./components/Header";
+import Sidebar from "./components/Sidebar";
 
 import { API, FILTERS, CATEGORIES } from "./utils/constants";
 import { timeAgo } from "./utils/helpers";
@@ -23,6 +25,9 @@ import TopSenders from "./components/TopSenders";
 function App() {
   const [phase, setPhase] = useState("checking");
   const [emails, setEmails] = useState([]);
+
+  const [userEmail, setUserEmail] = useState("");
+
 
   const isRefreshing = useRef(false);
 
@@ -37,6 +42,15 @@ function App() {
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(()=> {
+        fetch(`${API}/auth/me`)
+        .then((r) => r.json())
+        .then((data) => setUserEmail(data.email));
+    }, []);
+
+   
+
 
   // one function, used for both the 30s poll and delete-checking
   async function refetchEmails() {
@@ -75,7 +89,6 @@ function App() {
   }
 
   if (phase === "checking") return <CenterMessage text="Checking login..." />;
-  if (phase === "loading") return <CenterMessage text="Loading your inbox..." />;
 
   if (phase === "loggedOut") {
     return (
@@ -96,15 +109,35 @@ function App() {
     );
   }
 
+  const handleSignIn = () => {
+  window.location.href = "/api/auth/login";
+};
+
+const handleSignOut = async () => {
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setUserEmail(null);
+  } catch (err) {
+    console.error("Sign out failed:", err);
+  }
+};
+
 
   return (
+    // App.jsx or a Layout.jsx
+<div className="flex h-screen overflow-hidden">
+  <Sidebar />
+  <div className="flex-1 min-w-0 overflow-hidden">
+    <Header userEmail={userEmail} onSignIn={handleSignIn} onSignOut={handleSignOut} />
     <Routes>
-      <Route path="/" element={<Dashboard emails={emails} refetchEmails ={refetchEmails} />} />
-      <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails ={refetchEmails}/>} />
-      <Route path="/activity" element={<Activity refetchEmails ={refetchEmails} />} />
-      <Route path="/inbox-stats" element={<InboxStats />} />
-      <Route path="/top-senders" element={<TopSenders refetchEmails ={refetchEmails} />} />
+            <Route path="/" element={<Dashboard emails={emails} refetchEmails ={refetchEmails} />} />
+            <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails ={refetchEmails}/>} />
+            <Route path="/activity" element={<Activity refetchEmails ={refetchEmails} />} />
+            <Route path="/inbox-stats" element={<InboxStats />} />
+            <Route path="/top-senders" element={<TopSenders refetchEmails ={refetchEmails} />} />
     </Routes>
+  </div>
+</div>
   );
 }
 

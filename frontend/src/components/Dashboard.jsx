@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { NavLink } from 'react-router-dom'
 
 import unreadIcon from "../assets/unread-message.png";
 import newsletterIcon from "../assets/newspaper.png";
@@ -42,6 +43,12 @@ function Dashboard({ emails, refetchEmails }) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
+    const [activityLog, setActivityLog] = useState([]);
+
+    const [healthScore, setHealthScore] = useState([]);
+    const [flaggedCount, setFlaggedCount] = useState(0);
+    const [worstOffender, setWorstOffender] = useState([]);
+
     useEffect(()=> {
         fetch(`${API}/auth/me`)
         .then((r) => r.json())
@@ -54,12 +61,39 @@ function Dashboard({ emails, refetchEmails }) {
         .then((data) => setUnsubscribeList(data));
     }, [emails.length]);
 
-    console.log(userEmail);
 
-    if (!userEmail) {
-        return <CenterMessage text="Loading your inbox..." />;
+    useEffect(() => {
+        fetch(`${API}/activity`)
+        .then((r) => r.json())
+        .then((data) => setActivityLog(data));
+    }, []);
+    
+    useEffect(()=> {
+        fetch(`${API}/health-score`)
+        .then((r) => r.json())
+        .then((data) => setHealthScore(data.health_score));
+    }, [emails.length]);
+
+    useEffect(()=> {
+        fetch(`${API}/worst-offender`)
+        .then((r) => r.json())
+        .then((data) => setWorstOffender(data));
+    }, [emails.length]);
+
+     useEffect(()=> {
+        fetch(`${API}/noise-scores`)
+        .then((r) => r.json())
+        .then((data) => {
+            const flaggedSenders = data.filter((s) => s.is_flagged);
+            setFlaggedCount(flaggedSenders.length);
+        })
+    }, [emails.length]);
+
+     if (!userEmail || !activityLog || !healthScore || !flaggedCount) {
+        return <CenterMessage text="Loading your dashboard" />;
     }
 
+   
     async function handleUnsubscribeClick(e, sender_email, link) {
         e.preventDefault(); // stop the <a> from navigating immediately
 
@@ -74,7 +108,6 @@ function Dashboard({ emails, refetchEmails }) {
         }
 
         window.open(link, "_blank", "noopener,noreferrer");
-        // remove it from the visible list right away
         setUnsubscribeList((prev) => prev.filter((item) => item.sender_email !== sender_email));
 
     }
@@ -126,7 +159,6 @@ function Dashboard({ emails, refetchEmails }) {
 
     function toggleSelect(id) 
     {
-        // prev is what the selectedId is right now
         setSelectedIds((prev) =>
             prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
         );
@@ -297,44 +329,76 @@ function Dashboard({ emails, refetchEmails }) {
         )}
 
         <div className="h-screen flex bg-gray-50 text-gray-800 overflow-hidden">
-        
-            <Sidebar/>
-
         {/* RIGHT SIDE */}
         <div className="flex-1 flex flex-col overflow-hidden">
-           <Header userEmail={userEmail} />
             {/* MAIN CONTENT */}
             <main className="flex-1 p-6 overflow-y-auto overflow-x-hidden">
 
             {/* WELCOME BANNER */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center text-white text-2xl">
-                    ✓
+            {unreadCount > 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center text-white text-2xl">
+                            !
+                        </div>
+                        <div>
+                            <h2 className="text-l font-bold text-gray-900">
+                                You've got {unreadCount} unread emails
+                            </h2>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Time to unclutter, head to Clean Up
+                            </p>
+                        </div>
+                    </div>
+                    <NavLink
+                        to="/cleanup"
+                        className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600"
+                    >
+                        <span>Clean now →</span>
+                    </NavLink>
                 </div>
-                <div>
-                    <h2 className="text-l font-bold text-gray-900">
-                    Hey there! — you've got {unreadCount} unread emails
-                    </h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                    We've tidied through your inbox. Ready when you are.
-                    </p>
+            ) : activityLog.length > 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center text-white text-2xl">
+                            ✓
+                        </div>
+                        <div>
+                            <h2 className="text-l font-bold text-gray-900">
+                                Nice work — your inbox is all caught up
+                            </h2>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Let's admire your great work — check the Activity log
+                            </p>
+                        </div>
+                    </div>
+                    <NavLink
+                        to="/activity"
+                        className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600"
+                    >
+                        <span>View activity →</span>
+                    </NavLink>
                 </div>
+            ) : (
+                <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gray-400 flex items-center justify-center text-white text-2xl">
+                        ·
+                    </div>
+                    <div>
+                        <h2 className="text-l font-bold text-gray-900">
+                            Your inbox is empty
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Nothing here yet — sync or check back later.
+                        </p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-3">
-                <button className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-100">
-                    Review first
-                </button>
-                <button className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-green-600">
-                    Clean now →
-                </button>
-                </div>
-            </div>
+            )}
 
                 {/* 4 STAT CARDS */}
                 <div className="grid grid-cols-4 gap-4 mb-6">
-                    <StatCard value={unreadCount} label="unread emails" color="text-green-500" icon={unreadIcon}/>
-                    <StatCard value={newsletterCount} label="newsletters" color="text-blue-500" icon={newsletterIcon} />
+                    <StatCard value={unreadCount} label="unread emails" color="text-blue-500" icon={unreadIcon}/>
+                    <StatCard value={newsletterCount} label="newsletters" color="text-orange-500" icon={newsletterIcon} />
                     <StatCard value={promotionsCount} label="promotions" color="text-yellow-500" icon={promotionIcon}/>
                     <StatCard value={emails.length} label="total emails" color="text-red-500" icon={totalIcon}/>
                 </div>
@@ -504,26 +568,27 @@ function Dashboard({ emails, refetchEmails }) {
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="font-semibold text-gray-900">Inbox health</h3>
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-medium">
-                                X flagged
+                                {flaggedCount} flagged
                             </span>
                         </div>
 
                         <div className="flex items-baseline gap-1 mb-1">
-                            <span className="text-4xl font-bold text-red-500">X</span>
+                            <span className="text-4xl font-bold text-red-500">{Math.round(healthScore)}</span>
                             <span className="text-sm text-gray-400 font-medium">/100</span>
                         </div>
                         {/*do colors - red orange green*/}
                         <p className="text-sm text-gray-500 mb-4"> 
-                            <span className="font-semibold text-gray-800">X</span> is your worst offender — X emails, X% unread.
+                            <span className="font-semibold text-gray-800">{ worstOffender.sender_name}</span> is your worst offender — {worstOffender.total_emails} emails, {worstOffender.unread_rate}% unread.
                         </p>
 
-                        <a
-                            href="#"
+                        <NavLink
+                            to="/top-senders"
+
                             className="flex items-center justify-between w-full px-4 py-2 rounded-lg border border-blue-400 text-blue-500 text-sm font-medium hover:bg-blue-50"
                         >
                             See top senders
                             <img src={rightArrowIcon} alt="" className="w-5 h-5" />
-                        </a>
+                        </NavLink>
                     </div>
 
 

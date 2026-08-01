@@ -3,6 +3,7 @@ import { API } from "../utils/constants";
 
 import Sidebar from "./Sidebar";
 import Header from "./Header";
+import CenterMessage from "./CenterMessage";
 import LoadingOverlay from "./LoadingOverlay";
 import SuggestionCard from "./SuggestionCard";
 import FilterPanel from "./FilterPanel";
@@ -37,7 +38,10 @@ export default function Cleanup({ emails, refetchEmails }) {
             .then((data) => setSuggestions(data));
     }, []);
 
-    // ---- suggestion-card delete flow ----
+     if (!userEmail || !suggestions) {
+        return <CenterMessage text="Loading your clean up..." />;
+      }
+
     async function confirmDelete() {
         const target_emails = pendingDelete;
         setPendingDelete(null);
@@ -257,10 +261,8 @@ export default function Cleanup({ emails, refetchEmails }) {
             )}
 
             <div className="h-screen flex bg-gray-50 text-gray-800 overflow-hidden">
-                <Sidebar />
 
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    <Header userEmail={userEmail} />
 
                     <main className=" flex-1 p-6 overflow-y-auto overflow-x-hidden">
                         {isDeleting && <LoadingOverlay action="delete" fullScreen />}
@@ -271,7 +273,7 @@ export default function Cleanup({ emails, refetchEmails }) {
                         <div className="mb-6">
                             <h1 className="text-2xl font-bold text-gray-900">Clean up</h1>
                             <p className="text-sm text-gray-500 mt-1">
-                                Suggested cleanups you can act on now, or filter to find your own.
+                                Suggested cleanups you can act on now, or filter to find your own
                             </p>
                         </div>
 
@@ -282,7 +284,7 @@ export default function Cleanup({ emails, refetchEmails }) {
                                 <span className="text-sm text-gray-400">Based on your inbox activity</span>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-3 gap-4 min-w-0">
                                 {suggestions.length > 0 ? (
                                     suggestions.map((s) => (
                                         <SuggestionCard key={s.title} suggestion={s} onDeleteClick={() => setPendingDelete(s)} />

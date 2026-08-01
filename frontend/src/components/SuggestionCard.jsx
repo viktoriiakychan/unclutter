@@ -15,7 +15,7 @@ export default function SuggestionCard({ suggestion, onDeleteClick }) {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col">
+    <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col min-w-0">
       <div className="flex items-start justify-between mb-4">
         <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 ${styles.icon}`}>
           {suggestion.sender[0].toUpperCase()}
@@ -25,8 +25,9 @@ export default function SuggestionCard({ suggestion, onDeleteClick }) {
         </span>
       </div>
 
-      <h4 className="font-semibold text-gray-900 text-sm mb-1">{suggestion.title}</h4>
-      <p className="text-sm text-gray-500 mb-4 flex-1">{suggestion.subtitle}</p>
+      <h4 className="font-semibold text-gray-900 text-sm mb-1 truncate">{suggestion.title}</h4>
+      <p className="text-sm text-gray-500 mb-4 flex-1 line-clamp-2">{suggestion.subtitle}</p>
+
 
       <div className="flex items-center justify-between">
         <span className="text-sm">

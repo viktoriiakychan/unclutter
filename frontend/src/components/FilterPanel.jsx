@@ -74,7 +74,7 @@ export default function FilterPanel({ emails, onFilteredChange }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="grid grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-3 gap-6 mb-6 min-w-0">
         <div>
           <label className="text-sm text-gray-600 block mb-1">Sender</label>
           <select

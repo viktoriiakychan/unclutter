@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { API } from "../utils/constants";
 import Sidebar from "./Sidebar";
+import CenterMessage from "./CenterMessage";
 import Header from "./Header";
 import { timeAgo } from "../utils/helpers";
 
@@ -47,18 +48,18 @@ export default function Activity({ refetchEmails }) {
         refetchEmails();
     }
 
+     if (!userEmail || !activityLog) {
+        return <CenterMessage text="Loading your activity..." />;
+      }
+
     return (
         <div className="h-screen flex bg-gray-50 text-gray-800 overflow-hidden">
-            <Sidebar />
-
             <div className="flex-1 flex flex-col overflow-hidden">
-                <Header userEmail={userEmail} />
-
                 <main className="flex-1 p-6 overflow-y-auto overflow-x-hidden">
                     <div className="mb-6">
                         <h1 className="text-2xl font-bold text-gray-900">Activity</h1>
                         <p className="text-sm text-gray-500 mt-1">
-                            A record of what you've cleaned up.
+                            A record of what you've cleaned up
                         </p>
                     </div>
 

@@ -201,6 +201,12 @@ def get_health_score():
     scores = an.get_inbox_health_score(conn)
     return jsonify(scores)
 
+@app.route("/worst-offender")
+def worst_offender():
+    conn = database.get_connection()
+    return jsonify(an.get_worst_offender(conn))
+
+
 @app.route("/dismiss-sender", methods=["POST"])
 def dismiss_sender():
     sender_email = request.get_json().get("sender_email")
@@ -226,6 +232,8 @@ def dismiss_sender():
     conn.commit()
     conn.close()
     return jsonify({"dismissed": True})
+
+
 
 
 if __name__ == "__main__":
