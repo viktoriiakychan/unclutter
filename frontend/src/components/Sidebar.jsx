@@ -45,7 +45,6 @@ function Sidebar() {
                 }
                 >
                 <span>Clean up</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">2,847</span>
             </NavLink>
             <NavLink
                 to="/activity"

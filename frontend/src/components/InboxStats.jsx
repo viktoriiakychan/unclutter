@@ -50,7 +50,7 @@ function buildDonutSegments(data, radius) {
 }
 
 const CATEGORY_RADIUS = 70;
-const READ_UNREAD_RADIUS = 55;
+const READ_UNREAD_RADIUS = 70;
 
 const STRIP_COLORS = {
   totalEmails: "text-red-500",
@@ -154,7 +154,7 @@ const attachmentTypeSegments = buildDonutSegments(attachmentTypeData, 70);
 
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        <main className="flex-1 p-6 overflow-y-auto overflow-x-hidden">
+        <main className="flex-1 p-6 pb-18 overflow-y-auto overflow-x-hidden">
 
           {/* PAGE HEAD */}
           <div className="flex items-end justify-between mb-6">
@@ -212,9 +212,8 @@ const attachmentTypeSegments = buildDonutSegments(attachmentTypeData, 70);
           </div>
 
           {/* DONUT ROW */}
-          <div className="grid grid-cols-3 gap-6 items-start">
-
-            <div className="col-span-2 bg-white rounded-xl border border-gray-200 p-5">
+         <div className="grid grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900">Email categories</h3>
                 <span className="text-sm text-gray-500">
@@ -243,7 +242,7 @@ const attachmentTypeSegments = buildDonutSegments(attachmentTypeData, 70);
               </div>
               <div className="flex items-center gap-7">
                 <div className="relative">
-                  <Donut segments={readUnreadSegments} radius={READ_UNREAD_RADIUS} size={140} />
+                  <Donut segments={readUnreadSegments} radius={READ_UNREAD_RADIUS} size={180} />
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-xl font-bold text-gray-900">
                       {stats.percentageUnread}%
