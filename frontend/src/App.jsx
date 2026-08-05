@@ -15,6 +15,7 @@ import CenterMessage from "./components/CenterMessage";
 import Dashboard from "./components/Dashboard";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
+import SyncProgress from "./components/SyncProgress";
 
 import { API, FILTERS, CATEGORIES } from "./utils/constants";
 import { timeAgo } from "./utils/helpers";
@@ -28,37 +29,31 @@ function App() {
 
   const [userEmail, setUserEmail] = useState("");
 
-
   const isRefreshing = useRef(false);
 
   useEffect(() => {
     checkLogin();
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     const interval = setInterval(() => {
-      refetchEmails();
-    }, 30000);
+      triggerSync().then(() => refetchEmails());
+    }, 30000); // every 30s
 
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(()=> {
-        fetch(`${API}/auth/me`)
-        .then((r) => r.json())
-        .then((data) => setUserEmail(data.email));
-    }, []);
-
-   
-
-
-  // one function, used for both the 30s poll and delete-checking
+  
+  // cheap — just reads your own DB, safe to poll often
   async function refetchEmails() {
-    await fetch(`${API}/sync`, { method: "POST" });
     const res = await fetch(`${API}/emails`);
     const data = await res.json();
     setEmails(data);
     return data;
+  }
+
+  // expensive — talks to Gmail, only call when you actually mean to sync
+  async function triggerSync() {
+    await fetch(`${API}/sync/start`, { method: "POST" });
   }
 
   async function checkLogin() {
@@ -77,16 +72,27 @@ function App() {
     setPhase("loading");
     await fetch(`${API}/auth/login`, { method: "POST" });
     await loadEverything();
+    //triggerSync(); // once, on login/load — not on every poll
   }
 
-  async function loadEverything() {
+ async function loadEverything() {
     setPhase("loading");
     const res = await fetch(`${API}/emails`);
     setEmails(await res.json());
     setPhase("ready");
 
-    refetchEmails();
-  }
+    try {
+      const emailRes = await fetch(`${API}/auth/me`);
+      const emailData = await emailRes.json();
+      if (emailData.email) {
+        setUserEmail(emailData.email);
+      }
+    } catch (err) {
+      console.error("Failed to fetch user email:", err);
+    }
+
+    triggerSync();
+} 
 
   if (phase === "checking") return <CenterMessage text="Checking login..." />;
 
@@ -110,34 +116,37 @@ function App() {
   }
 
   const handleSignIn = () => {
-  window.location.href = "/api/auth/login";
-};
+    window.location.href = "/api/auth/login";
+  };
+
+  
 
 const handleSignOut = async () => {
-  try {
-    await fetch("/api/auth/logout", { method: "POST" });
-    setUserEmail(null);
-  } catch (err) {
-    console.error("Sign out failed:", err);
-  }
-};
-
+    try {
+      await fetch(`${API}/auth/logout`, { method: "POST" });
+      setUserEmail(null);
+      setEmails([]);
+      setPhase("loggedOut");
+    } catch (err) {
+      console.error("Sign out failed:", err);
+    }
+  };
 
   return (
-    // App.jsx or a Layout.jsx
-<div className="flex h-screen overflow-hidden">
-  <Sidebar />
-  <div className="flex-1 min-w-0 overflow-hidden">
-    <Header userEmail={userEmail} onSignIn={handleSignIn} onSignOut={handleSignOut} />
-    <Routes>
-            <Route path="/" element={<Dashboard emails={emails} refetchEmails ={refetchEmails} />} />
-            <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails ={refetchEmails}/>} />
-            <Route path="/activity" element={<Activity refetchEmails ={refetchEmails} />} />
-            <Route path="/inbox-stats" element={<InboxStats />} />
-            <Route path="/top-senders" element={<TopSenders refetchEmails ={refetchEmails} />} />
-    </Routes>
-  </div>
-</div>
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar />
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <Header userEmail={userEmail} onSignIn={handleSignIn} onSignOut={handleSignOut} />
+        <SyncProgress API={API}/>
+        <Routes>
+          <Route path="/" element={<Dashboard emails={emails} refetchEmails={refetchEmails} userEmail={userEmail} />} />
+          <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails={refetchEmails}/>} />
+          <Route path="/activity" element={<Activity refetchEmails={refetchEmails} />} />
+          <Route path="/inbox-stats" element={<InboxStats />} />
+          <Route path="/top-senders" element={<TopSenders refetchEmails={refetchEmails} />} />
+        </Routes>
+      </div>
+    </div>
   );
 }
 

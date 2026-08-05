@@ -5,8 +5,10 @@ from gmail_client import GmailClient
 import analytics as an
 
 from flask import request
-
 import database
+import threading
+
+import os
 
 app = Flask(__name__) # create the web application 
 CORS(app)
@@ -14,6 +16,9 @@ CORS(app)
 database.create_table()
 database.create_activity_table()
 database.create_dismissed_senders_table()
+database.create_sync_state_table()
+
+sync_progress = {"synced": 0, "total": 0, "running": False}
 
 @app.route("/emails") # when someone visits /emails run this function 
 def get_emails():
@@ -59,17 +64,21 @@ def sync():
 
 @app.route("/auth/me")
 def get_logged_in_user():
-
-    client = GmailClient()
-    client.connect()
-
-    profile = client.get_profile()
-    return profile
+    try:
+        client = GmailClient()
+        client.connect()
+        profile = client.get_profile()
+        return profile
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
 
 @app.route("/unsubscribe-list")
 def unsubscribe_list():
-    client = GmailClient()
-    client.connect()
+    try:
+        client = GmailClient()
+        client.connect()
+    except RuntimeError:
+        return jsonify([])
 
     raw_list = client.get_unsubscribe_links()
 
@@ -95,8 +104,11 @@ def trash_emails():
     if not ids:
         return jsonify({"error": "no ids provided"}), 400
 
-    client = GmailClient()
-    client.connect()
+    try:
+        client = GmailClient()
+        client.connect()
+    except RuntimeError:
+        return jsonify({"error": "not_logged_in"}), 401
 
     client.trash(ids)
     database.delete_emails(ids)
@@ -109,8 +121,11 @@ def archive_emails():
     if not ids:
         return jsonify({"error": "no ids provided"}), 400
 
-    client = GmailClient()
-    client.connect()
+    try:
+        client = GmailClient()
+        client.connect()
+    except RuntimeError:
+        return jsonify({"error": "not_logged_in"}), 401
 
     client.archive(ids)
     database.mark_archived(ids)
@@ -139,8 +154,12 @@ def untrash_emails():
     if not ids:
         return jsonify({"error": "no ids provided"}), 400
 
-    client = GmailClient()
-    client.connect()
+    try:
+        client = GmailClient()
+        client.connect()
+    except RuntimeError:
+        return jsonify({"error": "not_logged_in"}), 401
+
     client.untrash(ids)
 
     database.restore_from_activity_log(ids)
@@ -154,8 +173,12 @@ def unarchive_emails():
     if not ids:
         return jsonify({"error": "no ids provided"}), 400
 
-    client = GmailClient()
-    client.connect()
+    try:
+        client = GmailClient()
+        client.connect()
+    except RuntimeError:
+        return jsonify({"error": "not_logged_in"}), 401
+
     client.unarchive(ids)
 
     database.mark_unarchived(ids)
@@ -234,7 +257,183 @@ def dismiss_sender():
     return jsonify({"dismissed": True})
 
 
+@app.route("/categories", methods=["GET"])
+def get_categories():
+    conn = database.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, description, color, created_at FROM categories")
+    rows = cursor.fetchall()
+    conn.close()
 
+    categories = [
+        {"id": r[0], "name": r[1], "description": r[2], "color": r[3], "created_at": r[4]}
+        for r in rows
+    ]
+    return jsonify(categories)
+
+
+@app.route("/categories", methods=["POST"])
+def create_category():
+    data = request.get_json()
+    name = data.get("name")
+    description = data.get("description")
+    color = data.get("color")
+
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    conn = database.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO categories (name, description, color) VALUES (?, ?, ?)",
+        (name, description, color),
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    conn.close()
+
+    return jsonify({"id": new_id, "name": name, "description": description, "color": color}), 201
+
+
+@app.route("/categories/<int:category_id>", methods=["PUT"])
+def update_category(category_id):
+    data = request.get_json()
+    name = data.get("name")
+    description = data.get("description")
+    color = data.get("color")
+
+    conn = database.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE categories SET name = ?, description = ?, color = ? WHERE id = ?",
+        (name, description, color, category_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"id": category_id, "name": name, "description": description, "color": color})
+
+
+@app.route("/categories/<int:category_id>", methods=["DELETE"])
+def delete_category(category_id):
+    conn = database.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"deleted": category_id})
+
+from googleapiclient.errors import HttpError
+
+def background_sync():
+    global sync_progress
+    sync_progress["running"] = True
+    sync_progress["synced"] = 0
+
+    conn = None
+    try:
+        conn = database.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM sync_state WHERE key = 'history_id'")
+        row = cursor.fetchone()
+
+        client = GmailClient()
+        client.connect()
+
+        needs_full_sync = row is None
+
+        if not needs_full_sync:
+            try:
+                changes, new_history_id = client.get_history(row[0])
+
+                for item in changes["deleted"]:
+                    database.delete_emails([item["message"]["id"]])
+
+                for item in changes["added"]:
+                    email_objs = client._fetch_full([item["message"]])
+                    database.save_emails(email_objs)
+
+                for item in changes["labels_added"]:
+                    label_ids = item.get("labelIds", [])
+                    msg_id = item["message"]["id"]
+                    if "UNREAD" in label_ids:
+                        cursor.execute("UPDATE emails SET unread = 1 WHERE id = ?", (msg_id,))
+                    if "TRASH" in label_ids:
+                        database.delete_emails([msg_id])
+
+                for item in changes["labels_removed"]:
+                    label_ids = item.get("labelIds", [])
+                    msg_id = item["message"]["id"]
+                    if "UNREAD" in label_ids:
+                        cursor.execute("UPDATE emails SET unread = 0 WHERE id = ?", (msg_id,))
+                    if "INBOX" in label_ids:
+                        database.mark_archived([msg_id])
+
+                cursor.execute(
+                    "UPDATE sync_state SET value = ? WHERE key = 'history_id'",
+                    (new_history_id,)
+                )
+                sync_progress["total"] = (
+                    len(changes["added"]) + len(changes["deleted"])
+                    + len(changes["labels_added"]) + len(changes["labels_removed"])
+                )
+                sync_progress["synced"] = sync_progress["total"]
+
+            except HttpError as e:
+                print("Stale history_id, falling back to full sync:", e)
+                needs_full_sync = True
+
+        if needs_full_sync:
+            message_stubs = client.list_all_message_ids()
+            sync_progress["total"] = len(message_stubs)
+
+            def update_progress(count):
+                sync_progress["synced"] = count
+
+            emails = client._fetch_full(message_stubs, on_progress=update_progress)
+            database.save_emails(emails)
+
+            for email in emails:
+                if email.attachment_count >= 1:
+                    client.sync_attachments(conn, email.id)
+
+            profile = client.get_profile()
+            cursor.execute("DELETE FROM sync_state WHERE key = 'history_id'")
+            cursor.execute(
+                "INSERT INTO sync_state (key, value) VALUES ('history_id', ?)",
+                (profile["historyId"],)
+            )
+
+        conn.commit()
+
+    except Exception as e:
+        print("background_sync failed:", e)
+        if conn:
+            conn.rollback()
+
+    finally:
+        if conn:
+            conn.close()
+        sync_progress["running"] = False
+
+@app.route("/sync/start", methods=["POST"])
+def start_sync():
+    if sync_progress["running"]:
+        return jsonify({"error": "already running"}), 409
+
+    threading.Thread(target=background_sync).start()  # starts it in the bkgrnd and doesnt wait for it to be finsihed 
+    return jsonify({"started": True})
+
+@app.route("/sync/progress")
+def get_sync_progress():
+    return jsonify(sync_progress)
+
+@app.route("/auth/logout", methods=["POST"])
+def auth_logout():
+    if os.path.exists("token.json"):
+        os.remove("token.json")
+    return jsonify({"logged_out": True})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

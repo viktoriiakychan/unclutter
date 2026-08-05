@@ -4,7 +4,9 @@ from models import Email
 DB_FILE = "emails.db"
 
 def get_connection():
-    return sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
 
 def create_table():
     conn = get_connection()
@@ -81,6 +83,18 @@ def create_dismissed_senders_table():
             dismissed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             last_seen_email_date INTEGER
         )
+    """)
+    conn.commit()
+    conn.close()
+
+def create_sync_state_table():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sync_state (
+        key TEXT PRIMARY KEY,
+        value TEXT
+        );
     """)
     conn.commit()
     conn.close()

@@ -24,7 +24,9 @@ class GmailClient:
 
     def connect(self):
         # buil the gmail service from a valid token. call after login exists
-
+        if not os.path.exists("token.json"):
+            raise RuntimeError("not_logged_in")
+        
         creds = Credentials.from_authorized_user_file("token.json", self.SCOPES)
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
@@ -115,8 +117,27 @@ class GmailClient:
         messages = results.get("messages", [])
         return self._fetch_full(messages) 
 
+    def list_all_message_ids(self):
+        message_ids = []
+        page_token = None
 
-    def _fetch_full(self, messages):
+        while True:
+            results = self.service.users().messages().list(
+                userId="me",
+                labelIds=["INBOX"],
+                maxResults=500,
+                pageToken=page_token
+            ).execute()
+
+            message_ids.extend(results.get("messages", []))
+            page_token = results.get("nextPageToken")
+
+            if not page_token:
+                break
+
+        return message_ids
+
+    def _fetch_full(self, messages, on_progress=None):
         full_messages = {}
 
         def handle_response(request_id, response, exception):
@@ -144,6 +165,9 @@ class GmailClient:
                 )
             batch.execute()
             time.sleep(0.1)
+
+            if on_progress:
+                on_progress(min(i+25, len(messages)))
 
         emails = []
 
@@ -232,6 +256,10 @@ class GmailClient:
 
         return emails
 
+    def get_all_emails(self, on_progress=None):
+        message_ids=self.list_all_message_ids()
+        return self._fetch_full(message_ids, on_progress=on_progress)
+
     def mark_as_read(self, email_ids):
         for email_id in email_ids:
             self.service.users().messages().modify(
@@ -288,8 +316,11 @@ class GmailClient:
 
     def get_profile(self):
         profile = self.service.users().getProfile(userId="me").execute()
+        return {"email": profile["emailAddress"], "historyId": profile["historyId"]}
 
-        return {"email": profile["emailAddress"]}
+    def get_message_count(self):
+        profile = self.service.users().getProfile(userId="me").execute()
+        return profile.get("messagesTotal", 0)
 
     def get_new_emails(self, existing_ids, limit=100):
         # get the recent message IDS!!! 
@@ -374,3 +405,30 @@ class GmailClient:
         self._collect_attachments(payload.get("parts", []), email_id, conn)
 
         conn.commit()
+
+    def get_history(self, start_history_id):
+        changes = {"added": [], "deleted": [], "labels_added": [], "labels_removed": []}
+        page_token = None
+        new_history_id = start_history_id
+
+        while True:
+            results = self.service.users().history().list(
+                userId="me",
+                startHistoryId=start_history_id,
+                pageToken=page_token
+            ).execute()
+
+            for record in results.get("history", []):
+                changes["added"].extend(record.get("messagesAdded", []))
+                changes["deleted"].extend(record.get("messagesDeleted", []))
+                changes["labels_added"].extend(record.get("labelsAdded", []))
+                changes["labels_removed"].extend(record.get("labelsRemoved", []))
+
+            if "historyId" in results:
+                new_history_id = results["historyId"]
+
+            page_token = results.get("nextPageToken")
+            if not page_token:
+                break
+
+        return changes, new_history_id
