@@ -19,7 +19,7 @@
     import { API, FILTERS, CATEGORIES } from "../utils/constants";
     import { timeAgo } from "../utils/helpers";
 
-    function Dashboard({ emails, refetchEmails, userEmail }) {
+    function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
     // stats computed from the real data
         const unreadCount = emails.filter((e) => e.unread).length;
         const promotionsCount = emails.filter((e) => e.category === "promotions").length;
@@ -44,10 +44,20 @@
 
         const [activityLog, setActivityLog] = useState([]);
 
-        const [healthScore, setHealthScore] = useState([]);
-        const [flaggedCount, setFlaggedCount] = useState(0);
-        const [worstOffender, setWorstOffender] = useState([]);
+        const [healthScore, setHealthScore] = useState(() => {
+        const cached = localStorage.getItem("healthScore");
+            return cached ? Number(cached) : null;
+        });
+        const [flaggedCount, setFlaggedCount] = useState(() => {
+            const cached = localStorage.getItem("flaggedCount");
+            return cached ? Number(cached) : 0;
+        });
+        const [worstOffender, setWorstOffender] = useState(() => {
+            const cached = localStorage.getItem("worstOffender");
+            return cached ? JSON.parse(cached) : null;
+        });
 
+        const showRealHealth = syncMostlyDone && healthScore !== null && emails.length > 0;
         useEffect(()=> {
             fetch(`${API}/unsubscribe-list`)
             .then((r) => r.json())
@@ -64,13 +74,19 @@
         useEffect(()=> {
             fetch(`${API}/health-score`)
             .then((r) => r.json())
-            .then((data) => setHealthScore(data.health_score));
+            .then((data) => {
+                setHealthScore(data.health_score);
+                localStorage.setItem("healthScore", data.health_score);
+            });
         }, [emails.length]);
 
         useEffect(()=> {
             fetch(`${API}/worst-offender`)
             .then((r) => r.json())
-            .then((data) => setWorstOffender(data));
+            .then((data) => {
+                setWorstOffender(data);
+                localStorage.setItem("worstOffender", JSON.stringify(data));
+            });
         }, [emails.length]);
 
         useEffect(()=> {
@@ -79,12 +95,14 @@
             .then((data) => {
                 const flaggedSenders = data.filter((s) => s.is_flagged);
                 setFlaggedCount(flaggedSenders.length);
-            })
+                localStorage.setItem("flaggedCount", flaggedSenders.length);
+            });
         }, [emails.length]);
 
-    if (!userEmail || !activityLog || healthScore == null || flaggedCount == null) {
-            return <CenterMessage text="Loading your dashboard" />;
-    }
+    
+        if (!userEmail || !activityLog || healthScore == null || flaggedCount == null) {
+                return <CenterMessage text="Loading your dashboard" />;
+        }
 
     
         async function handleUnsubscribeClick(e, sender_email, link) {
@@ -450,7 +468,13 @@
                         <div className="relative">
                             {isDeleting && <LoadingOverlay action="delete" />}
                             {isArchiving && <LoadingOverlay action="archive" />}
-                            <div className="relative max-h-79 overflow-y-auto">
+
+                            {emails.length === 0 ? (
+                                <div className="flex items-center justify-center py-12 text-sm text-gray-400">
+                                    Waiting for your first emails to sync...
+                                </div>
+                                ) : (
+                                <div className="relative max-h-79 overflow-y-auto">
 
                                 {filteredEmails.map((email) => {
                                     const isSelected = selectedIds.includes(email.id);
@@ -513,7 +537,9 @@
                                 );
                                 })}
                             </div>
+                                )}
                         </div>
+                        
                         <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
                             <div className="flex items-center gap-3">
                                 <label className="flex items-center gap-2 cursor-pointer">
@@ -557,39 +583,55 @@
                     <div className="space-y-4">
 
                         {/* panel 1 — inbox health */}
-                        <div className="bg-white rounded-xl border border-gray-200 p-5">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-semibold text-gray-900">Inbox health</h3>
+                      <div className="bg-white rounded-xl border border-gray-200 p-5">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-semibold text-gray-900">Inbox health</h3>
+                            {showRealHealth ? (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-medium">
                                     {flaggedCount} flagged
                                 </span>
-                            </div>
-
-                            <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-4xl font-bold text-red-500">{Math.round(healthScore)}</span>
-                                <span className="text-sm text-gray-400 font-medium">/100</span>
-                            </div>
-                            {/*do colors - red orange green*/}
-                            <p className="text-sm text-gray-500 mb-4"> 
-        {worstOffender && worstOffender.sender_name ? (
-            <>
-                <span className="font-semibold text-gray-800">{worstOffender.sender_name}</span> is your worst offender — {worstOffender.total_emails} emails, {worstOffender.unread_rate}% unread.
-            </>
-        ) : (
-            "No offenders yet — your inbox is looking clean."
-        )}
-    </p>
-
-                            <NavLink
-                                to="/top-senders"
-
-                                className="flex items-center justify-between w-full px-4 py-2 rounded-lg border border-blue-400 text-blue-500 text-sm font-medium hover:bg-blue-50"
-                            >
-                                See top senders
-                                <img src={rightArrowIcon} alt="" className="w-5 h-5" />
-                            </NavLink>
+                            ) : (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium animate-pulse">
+                                    calculating...
+                                </span>
+                            )}
                         </div>
 
+                        {showRealHealth ? (
+                            <>
+                                <div className="flex items-baseline gap-1 mb-1">
+                                    <span className="text-4xl font-bold text-red-500">{Math.round(healthScore)}</span>
+                                    <span className="text-sm text-gray-400 font-medium">/100</span>
+                                </div>
+                                <p className="text-sm text-gray-500 mb-4">
+                                    {worstOffender && worstOffender.sender_name ? (
+                                        <>
+                                            <span className="font-semibold text-gray-800">{worstOffender.sender_name}</span> is your worst offender — {worstOffender.total_emails} emails, {worstOffender.unread_rate}% unread.
+                                        </>
+                                    ) : (
+                                        "No offenders yet — your inbox is looking clean."
+                                    )}
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex items-baseline gap-2 mb-1 animate-pulse">
+                                    <div className="h-9 w-16 bg-gray-200 rounded" />
+                                    <div className="h-4 w-8 bg-gray-200 rounded" />
+                                </div>
+                                <div className="h-4 w-full bg-gray-200 rounded mb-1 mt-3 animate-pulse" />
+                                <div className="h-4 w-2/3 bg-gray-200 rounded mb-4 animate-pulse" />
+                            </>
+                        )}
+
+                        <NavLink
+                            to="/top-senders"
+                            className="flex items-center justify-between w-full px-4 py-2 rounded-lg border border-blue-400 text-blue-500 text-sm font-medium hover:bg-blue-50"
+                        >
+                            See top senders
+                            <img src={rightArrowIcon} alt="" className="w-5 h-5" />
+                        </NavLink>
+                    </div>
 
                         {/* panel 2 — unsubscribe */}
                         <div className="bg-white rounded-xl border border-gray-200 p-5 max-h-60 overflow-y-auto">

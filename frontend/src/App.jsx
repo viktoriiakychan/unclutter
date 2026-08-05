@@ -35,14 +35,41 @@ function App() {
     checkLogin();
   }, []);
 
-useEffect(() => {
+    useEffect(() => {
     const interval = setInterval(() => {
       triggerSync().then(() => refetchEmails());
     }, 30000); // every 30s
 
     return () => clearInterval(interval);
   }, []);
-  
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const res = await fetch(`${API}/sync/progress`);
+      const progress = await res.json();
+      if (progress.running) {
+        refetchEmails();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+const [syncProgress, setSyncProgress] = useState({ synced: 0, total: 0, running: false, type: null });
+
+useEffect(() => {
+    function checkProgress() {
+      fetch(`${API}/sync/progress`)
+        .then((r) => r.json())
+        .then(setSyncProgress);
+    }
+    checkProgress();
+    const interval = setInterval(checkProgress, 1000);
+    return () => clearInterval(interval);
+}, []);
+
+const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
+
   // cheap — just reads your own DB, safe to poll often
   async function refetchEmails() {
     const res = await fetch(`${API}/emails`);
@@ -127,10 +154,14 @@ const handleSignOut = async () => {
       setUserEmail(null);
       setEmails([]);
       setPhase("loggedOut");
+
+      localStorage.removeItem("healthScore");
+      localStorage.removeItem("flaggedCount");
+      localStorage.removeItem("worstOffender");
     } catch (err) {
       console.error("Sign out failed:", err);
     }
-  };
+};
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -139,7 +170,7 @@ const handleSignOut = async () => {
         <Header userEmail={userEmail} onSignIn={handleSignIn} onSignOut={handleSignOut} />
         <SyncProgress API={API}/>
         <Routes>
-          <Route path="/" element={<Dashboard emails={emails} refetchEmails={refetchEmails} userEmail={userEmail} />} />
+          <Route path="/" element={<Dashboard emails={emails} refetchEmails={refetchEmails} userEmail={userEmail} syncMostlyDone={syncMostlyDone} />} />
           <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails={refetchEmails}/>} />
           <Route path="/activity" element={<Activity refetchEmails={refetchEmails} />} />
           <Route path="/inbox-stats" element={<InboxStats />} />

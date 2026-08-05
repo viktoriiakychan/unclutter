@@ -12,7 +12,7 @@ export default function SyncProgress({ API }) {
     return () => clearInterval(interval);
   }, []);
 
-  if (!progress.running) return null;
+  if (!progress.running || progress.type !== "full") return null;
 
   const pct = progress.total ? Math.round((progress.synced / progress.total) * 100) : 0;
 

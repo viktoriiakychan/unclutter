@@ -137,123 +137,105 @@ class GmailClient:
 
         return message_ids
 
-    def _fetch_full(self, messages, on_progress=None):
+    def _parse_message(self, msg):
+        payload = msg.get("payload", {})
+        headers = payload.get("headers", [])
+
+        sender = subject = date = unsubscribe = ""
+        is_newsletter = False
+
+        for header in headers:
+            if header["name"] == "From":
+                sender = header["value"]
+            elif header["name"] == "Subject":
+                subject = header["value"]
+            elif header["name"] == "Date":
+                date = header["value"]
+            elif header["name"] == "List-Unsubscribe":
+                is_newsletter = True
+                unsubscribe = header["value"]
+
+        attachment_count, attachment_size = self.attachment_stats(payload.get("parts", []))
+        sender_name, sender_email = parseaddr(sender)
+        labels = msg.get("labelIds", [])
+
+        category = "other"
+        if "CATEGORY_PROMOTIONS" in labels:
+            category = "promotions"
+        elif "CATEGORY_SOCIAL" in labels:
+            category = "social"
+        elif "CATEGORY_UPDATES" in labels:
+            category = "updates"
+        elif "CATEGORY_FORUMS" in labels:
+            category = "forums"
+
+        return Email(
+            id=msg["id"],
+            thread_id=msg["threadId"],
+            sender_name=sender_name,
+            sender_email=sender_email,
+            subject=subject,
+            date=date,
+            unread=("UNREAD" in labels),
+            category=category,
+            attachment_count=attachment_count,
+            attachment_size=attachment_size,
+            is_newsletter=is_newsletter,
+            unsubscribe=unsubscribe,
+            internal_date=int(msg.get("internalDate", 0))
+        )
+
+    def _fetch_full(self, messages, on_progress=None, on_batch=None, should_stop=None):
         full_messages = {}
+        failed_ids = []
 
         def handle_response(request_id, response, exception):
             if exception is not None:
-                if "429" not in str(exception):
+                if "429" in str(exception):
+                    failed_ids.append(request_id)
+                else:
                     print("Failed to fetch", request_id, exception)
                 return
             full_messages[request_id] = response
 
-        # send in smaller chunks 
-        for i in range(0, len(messages), 25):   # was 5
-            chunk = messages[i:i+25]
+        for i in range(0, len(messages), 25):
+            if should_stop and should_stop():
+                break
 
-            batch = self.service.new_batch_http_request(
-                callback=handle_response
-            )
+            chunk = messages[i:i+25]
+            batch = self.service.new_batch_http_request(callback=handle_response)
 
             for message in chunk:
                 batch.add(
-                    self.service.users().messages().get(
-                        userId="me",
-                        id=message["id"]    
-                    ),
+                    self.service.users().messages().get(userId="me", id=message["id"]),
                     request_id=message["id"]
                 )
             batch.execute()
-            time.sleep(0.1)
+            time.sleep(0.2)  # slightly longer pause, fewer 429s in the first place
 
+            batch_emails = [self._parse_message(full_messages[m["id"]]) for m in chunk if m["id"] in full_messages]
+
+            if on_batch:
+                on_batch(batch_emails)
             if on_progress:
                 on_progress(min(i+25, len(messages)))
 
-        emails = []
-
-        for message in messages:
-            msg = full_messages.get(message["id"])
-
-            if msg is None:
-                continue
-
-            payload = msg.get(
-                "payload",
-                {}
-            )
-
-            headers = payload.get(
-                "headers",
-                []
-            )
-
-            sender = ""
-            subject = ""
-            date = ""
-            is_newsletter = False
-            unsubscribe = "" 
-
-            for header in headers:
-
-                if header["name"] == "From":
-                    sender = header["value"]
-
-                elif header["name"] == "Subject":
-                    subject = header["value"]
-
-                elif header["name"] == "Date":
-                    date = header["value"]
-
-                elif header["name"] == "List-Unsubscribe":
-                    is_newsletter = True
-                    unsubscribe = header["value"]
-
-            attachment_count, attachment_size = (
-                self.attachment_stats(
-                    payload.get(
-                        "parts",
-                        []
-                    )
+        # retry anything that got rate-limited, once, after a short cooldown
+        if failed_ids:
+            time.sleep(2)
+            retry_batch = self.service.new_batch_http_request(callback=handle_response)
+            for msg_id in failed_ids:
+                retry_batch.add(
+                    self.service.users().messages().get(userId="me", id=msg_id),
+                    request_id=msg_id
                 )
-            )
-            
-            sender_name, sender_email = parseaddr(sender)
+            retry_batch.execute()
 
-            labels = msg.get("labelIds", [])
-            
-            category = "other"
+            retried_emails = [self._parse_message(full_messages[mid]) for mid in failed_ids if mid in full_messages]
+            if on_batch and retried_emails:
+                on_batch(retried_emails)
 
-            if "CATEGORY_PROMOTIONS" in labels:
-                category = "promotions"
-            elif "CATEGORY_SOCIAL" in labels:
-                category = "social"
-            elif "CATEGORY_UPDATES" in labels:
-                category = "updates"
-            elif "CATEGORY_FORUMS" in labels:
-                category = "forums"
-            else:
-                category = "other"       
-
-            email = Email(
-                id=msg["id"],
-                thread_id=msg["threadId"],
-                sender_name=sender_name,
-                sender_email=sender_email,
-                subject=subject,
-                date=date,
-                unread=("UNREAD" in labels),
-
-                category=category,
-                
-                attachment_count=attachment_count,
-                attachment_size=attachment_size,
-                is_newsletter = is_newsletter,
-                unsubscribe=unsubscribe, 
-                internal_date=int(msg.get("internalDate", 0))
-            )
-
-            emails.append(email)
-
+        emails = [self._parse_message(full_messages[m["id"]]) for m in messages if m["id"] in full_messages]
         return emails
 
     def get_all_emails(self, on_progress=None):

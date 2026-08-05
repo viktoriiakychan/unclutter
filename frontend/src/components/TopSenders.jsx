@@ -139,7 +139,7 @@ export default function TopSenders({refetchEmails}) {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <div className="flex-1 flex flex-col">
-        <main className="px-10 py-8 flex-1">
+        <main className="px-10 pb-16 py-8 flex-1">
           <h1 className="text-2xl font-bold text-gray-900 m-0">Top Senders</h1>
           <p className="text-sm text-gray-500 mt-1.5 mb-6">
             Ranked by how much noise they add to your inbox

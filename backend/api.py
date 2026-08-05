@@ -18,7 +18,8 @@ database.create_activity_table()
 database.create_dismissed_senders_table()
 database.create_sync_state_table()
 
-sync_progress = {"synced": 0, "total": 0, "running": False}
+sync_progress = {"synced": 0, "total": 0, "running": False, "type": None}
+sync_cancelled = threading.Event()
 
 @app.route("/emails") # when someone visits /emails run this function 
 def get_emails():
@@ -328,6 +329,7 @@ from googleapiclient.errors import HttpError
 
 def background_sync():
     global sync_progress
+    sync_cancelled.clear()
     sync_progress["running"] = True
     sync_progress["synced"] = 0
 
@@ -344,6 +346,7 @@ def background_sync():
         needs_full_sync = row is None
 
         if not needs_full_sync:
+            sync_progress["type"] = "incremental"
             try:
                 changes, new_history_id = client.get_history(row[0])
 
@@ -353,6 +356,9 @@ def background_sync():
                 for item in changes["added"]:
                     email_objs = client._fetch_full([item["message"]])
                     database.save_emails(email_objs)
+                    for email in email_objs:
+                        if email.attachment_count >= 1:
+                            client.sync_attachments(conn, email.id)
 
                 for item in changes["labels_added"]:
                     label_ids = item.get("labelIds", [])
@@ -385,18 +391,25 @@ def background_sync():
                 needs_full_sync = True
 
         if needs_full_sync:
+            sync_progress["type"] = "full"
             message_stubs = client.list_all_message_ids()
             sync_progress["total"] = len(message_stubs)
 
             def update_progress(count):
                 sync_progress["synced"] = count
 
-            emails = client._fetch_full(message_stubs, on_progress=update_progress)
-            database.save_emails(emails)
+            def save_batch(batch):
+                database.save_emails(batch)
+                for email in batch:
+                    if email.attachment_count >= 1:
+                        client.sync_attachments(conn, email.id)
 
-            for email in emails:
-                if email.attachment_count >= 1:
-                    client.sync_attachments(conn, email.id)
+            emails = client._fetch_full(
+                message_stubs,
+                on_progress=update_progress,
+                on_batch=save_batch,
+                should_stop=lambda: sync_cancelled.is_set()
+            )
 
             profile = client.get_profile()
             cursor.execute("DELETE FROM sync_state WHERE key = 'history_id'")
@@ -431,8 +444,14 @@ def get_sync_progress():
 
 @app.route("/auth/logout", methods=["POST"])
 def auth_logout():
+    sync_cancelled.set()
+    sync_progress["running"] = False
+
     if os.path.exists("token.json"):
         os.remove("token.json")
+
+    database.clear_all_local_data()
+
     return jsonify({"logged_out": True})
 
 if __name__ == "__main__":

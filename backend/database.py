@@ -307,3 +307,16 @@ def restore_from_activity_log(ids):
 
     conn.commit()
     conn.close()
+
+def clear_all_local_data():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM emails")
+    cursor.execute("DELETE FROM attachments")
+    cursor.execute("DELETE FROM sync_state")
+    cursor.execute("DELETE FROM dismissed_senders")
+    cursor.execute("DELETE FROM activity_log")
+
+    conn.commit()
+    conn.close()
