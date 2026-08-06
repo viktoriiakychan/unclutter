@@ -379,7 +379,11 @@ def get_sender_noise_scores(conn, min_emails=5):
         unread_rate = unread_count / total
         deleted_rate = deleted_count / total
 
-        noise_score = round((unread_rate * 80 + deleted_rate * 40), 1)
+        if deleted_rate:
+            noise_score = round((unread_rate * 95 + deleted_rate * 10), 1)
+        else:
+            noise_score = round((unread_rate * 100), 1)
+
         is_flagged = True if noise_score > 60 else False
 
         clean_link = get_unsubscribe_link(unsubscribe_link)
@@ -397,7 +401,7 @@ def get_sender_noise_scores(conn, min_emails=5):
             "unsubscribe_link": clean_link,
         })
 
-    scored.sort(key=lambda x: x["noise_score"], reverse=True)
+    scored.sort(key=lambda x: (x["noise_score"], x["total_emails"]), reverse=True)
     return scored
 
 def get_worst_offender(conn, min_emails=5):

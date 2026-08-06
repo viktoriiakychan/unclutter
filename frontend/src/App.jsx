@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useNavigate } from 'react-router-dom'
 import Cleanup from './components/Cleanup'
+import SyncRangePicker from "./components/SyncRangePicker";
 
 import unreadIcon from "./assets/unread-message.png";
 import newsletterIcon from "./assets/newspaper.png";
@@ -31,17 +32,28 @@ function App() {
 
   const isRefreshing = useRef(false);
 
+  const navigate = useNavigate();
+
   useEffect(() => {
     checkLogin();
   }, []);
 
-    useEffect(() => {
-    const interval = setInterval(() => {
-      triggerSync().then(() => refetchEmails());
-    }, 30000); // every 30s
+  const phaseRef = useRef(phase);
 
+  useEffect(() => {
+      phaseRef.current = phase;
+  }, [phase]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (phaseRef.current === "ready") {
+        triggerSync().then(() => refetchEmails());
+      }
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -98,8 +110,7 @@ const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
   async function handleLogin() {
     setPhase("loading");
     await fetch(`${API}/auth/login`, { method: "POST" });
-    await loadEverything();
-    //triggerSync(); // once, on login/load — not on every poll
+    setPhase("pickingRange");
   }
 
  async function loadEverything() {
@@ -142,6 +153,12 @@ const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
     );
   }
 
+  if (phase === "pickingRange") {
+    return <SyncRangePicker onSelect={handleRangeSelected} />;
+  }
+
+  if (phase === "loading") return <CenterMessage text="Signing you in..." />;
+
   const handleSignIn = () => {
     window.location.href = "/api/auth/login";
   };
@@ -154,6 +171,7 @@ const handleSignOut = async () => {
       setUserEmail(null);
       setEmails([]);
       setPhase("loggedOut");
+      navigate("/");
 
       localStorage.removeItem("healthScore");
       localStorage.removeItem("flaggedCount");
@@ -162,6 +180,41 @@ const handleSignOut = async () => {
       console.error("Sign out failed:", err);
     }
 };
+
+async function handleRangeSelected(days) {
+    setPhase("loading");
+    const res = await fetch(`${API}/emails`);
+    setEmails(await res.json());
+    setPhase("ready");
+
+    // poll until the backend genuinely confirms it's ready, instead of guessing a delay
+    let ready = false;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      try {
+        const emailRes = await fetch(`${API}/auth/me`);
+        const emailData = await emailRes.json();
+        if (emailData.email) {
+          setUserEmail(emailData.email);
+          ready = true;
+          break;
+        }
+      } catch (err) {
+        console.error("auth/me check failed:", err);
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    if (!ready) {
+      console.error("Gave up waiting for backend to be ready");
+      return;
+    }
+
+    await fetch(`${API}/sync/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ days }),
+    });
+}
 
   return (
     <div className="flex h-screen overflow-hidden">

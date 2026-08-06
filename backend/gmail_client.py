@@ -117,14 +117,16 @@ class GmailClient:
         messages = results.get("messages", [])
         return self._fetch_full(messages) 
 
-    def list_all_message_ids(self):
+    def list_all_message_ids(self, days=None):
         message_ids = []
         page_token = None
+        query = f"newer_than:{days}d" if days else None
 
         while True:
             results = self.service.users().messages().list(
                 userId="me",
                 labelIds=["INBOX"],
+                q=query,
                 maxResults=500,
                 pageToken=page_token
             ).execute()
@@ -204,14 +206,17 @@ class GmailClient:
 
             chunk = messages[i:i+25]
             batch = self.service.new_batch_http_request(callback=handle_response)
-
             for message in chunk:
                 batch.add(
                     self.service.users().messages().get(userId="me", id=message["id"]),
                     request_id=message["id"]
                 )
             batch.execute()
-            time.sleep(0.2)  # slightly longer pause, fewer 429s in the first place
+            time.sleep(0.1)
+
+            if should_stop and should_stop():
+                print("Sync cancelled, discarding this batch")
+                break
 
             batch_emails = [self._parse_message(full_messages[m["id"]]) for m in chunk if m["id"] in full_messages]
 

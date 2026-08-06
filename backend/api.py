@@ -327,11 +327,12 @@ def delete_category(category_id):
 
 from googleapiclient.errors import HttpError
 
-def background_sync():
+def background_sync(sync_days=None):
     global sync_progress
     sync_cancelled.clear()
     sync_progress["running"] = True
     sync_progress["synced"] = 0
+    sync_progress["total"] = 0 
 
     conn = None
     try:
@@ -363,10 +364,26 @@ def background_sync():
                 for item in changes["labels_added"]:
                     label_ids = item.get("labelIds", [])
                     msg_id = item["message"]["id"]
+
                     if "UNREAD" in label_ids:
                         cursor.execute("UPDATE emails SET unread = 1 WHERE id = ?", (msg_id,))
+
                     if "TRASH" in label_ids:
                         database.delete_emails([msg_id])
+
+                    if "INBOX" in label_ids:
+                        cursor.execute("SELECT id FROM emails WHERE id = ?", (msg_id,))
+                        exists = cursor.fetchone()
+
+                        if exists:
+                            database.mark_unarchived([msg_id])
+                        else:
+                            restored = client._fetch_full([{"id": msg_id}])
+                            if restored:
+                                database.save_emails(restored)
+                                for email in restored:
+                                    if email.attachment_count >= 1:
+                                        client.sync_attachments(conn, email.id)
 
                 for item in changes["labels_removed"]:
                     label_ids = item.get("labelIds", [])
@@ -392,13 +409,15 @@ def background_sync():
 
         if needs_full_sync:
             sync_progress["type"] = "full"
-            message_stubs = client.list_all_message_ids()
+            message_stubs = client.list_all_message_ids(days=sync_days)
             sync_progress["total"] = len(message_stubs)
 
             def update_progress(count):
                 sync_progress["synced"] = count
 
             def save_batch(batch):
+                if sync_cancelled.is_set():
+                    return
                 database.save_emails(batch)
                 for email in batch:
                     if email.attachment_count >= 1:
@@ -410,6 +429,10 @@ def background_sync():
                 on_batch=save_batch,
                 should_stop=lambda: sync_cancelled.is_set()
             )
+
+            if sync_cancelled.is_set():
+                print("Sync was cancelled — skipping history checkpoint")
+                return
 
             profile = client.get_profile()
             cursor.execute("DELETE FROM sync_state WHERE key = 'history_id'")
@@ -435,7 +458,10 @@ def start_sync():
     if sync_progress["running"]:
         return jsonify({"error": "already running"}), 409
 
-    threading.Thread(target=background_sync).start()  # starts it in the bkgrnd and doesnt wait for it to be finsihed 
+    body = request.get_json(silent=True) or {}
+    sync_days = body.get("days")
+
+    threading.Thread(target=background_sync, args=(sync_days,)).start()
     return jsonify({"started": True})
 
 @app.route("/sync/progress")
@@ -446,6 +472,9 @@ def get_sync_progress():
 def auth_logout():
     sync_cancelled.set()
     sync_progress["running"] = False
+    sync_progress["synced"] = 0
+    sync_progress["total"] = 0
+    sync_progress["type"] = None
 
     if os.path.exists("token.json"):
         os.remove("token.json")
@@ -454,5 +483,15 @@ def auth_logout():
 
     return jsonify({"logged_out": True})
 
+@app.route("/message-count")
+def message_count():
+    try:
+        client = GmailClient()
+        client.connect()
+        count = client.get_message_count()
+        return jsonify({"count": count})
+    except RuntimeError:
+        return jsonify({"count": None})
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, threaded=True)

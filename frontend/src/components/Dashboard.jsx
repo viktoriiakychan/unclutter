@@ -636,31 +636,35 @@
                         {/* panel 2 — unsubscribe */}
                         <div className="bg-white rounded-xl border border-gray-200 p-5 max-h-60 overflow-y-auto">
                             <h3 className="font-semibold text-gray-900 mb-4">Unsubscribe</h3>
-                            <div className="space-y-3 text-sm">
-                                {unsubscribeList.map((item) =>(
-                                    <div key={item.sender_email} className="flex items-center justify-between gap-2">
-                                    {/* name block — left */}
-                                    <div className="min-w-0">
-                                        <div className="text-[12px] text-gray-700 truncate">{item.sender_name}</div>
-                                        <div className="text-[10px] text-gray-400 truncate">{item.sender_email}</div>
-                                    </div>
+                            {unsubscribeList.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-6 text-center">
+                                    <p className="text-sm text-gray-500">No newsletters to unsubscribe from</p>
+                                    <p className="text-xs text-gray-400 mt-1">You're all caught up here</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3 text-sm">
+                                    {unsubscribeList.map((item) =>(
+                                        <div key={item.sender_email} className="flex items-center justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <div className="text-[12px] text-gray-700 truncate">{item.sender_name}</div>
+                                                <div className="text-[10px] text-gray-400 truncate">{item.sender_email}</div>
+                                            </div>
 
-                                    {/* count + button — grouped together on the right */}
-                                    <div className="flex items-center gap-3 flex-shrink-0">
-                                        <span className="w-6 text-right text-xs text-gray-400">{item.count}</span>
-                                        <a 
-                                            href={item.unsubscribe}
-                                            onClick={(e) => handleUnsubscribeClick(e, item.sender_email, item.unsubscribe)}
-                                            className="px-2 py-1 rounded-lg border border-blue-400 text-blue-500 text-xs font-medium hover:bg-blue-50"
-                                        >
-                                            Unsubscribe
-                                        </a>
-                                    </div>
-                                    </div>
-                                ))}
-                            </div>
+                                            <div className="flex items-center gap-3 flex-shrink-0">
+                                                <span className="w-6 text-right text-xs text-gray-400">{item.count}</span>
+                                                <a
+                                                    href={item.unsubscribe}
+                                                    onClick={(e) => handleUnsubscribeClick(e, item.sender_email, item.unsubscribe)}
+                                                    className="px-2 py-1 rounded-lg border border-blue-400 text-blue-500 text-xs font-medium hover:bg-blue-50"
+                                                >
+                                                    Unsubscribe
+                                                </a>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-
                     </div>
                 </div>
                 </main>

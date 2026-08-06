@@ -62,6 +62,8 @@ export default function Cleanup({ emails, refetchEmails }) {
             const freshRes = await fetch(`${API}/suggestions`);
             const fresh = await freshRes.json();
             setSuggestions(fresh);
+
+            await refetchEmails();
         } catch (err) {
             console.error("Delete failed:", err);
         } finally {
@@ -260,11 +262,9 @@ export default function Cleanup({ emails, refetchEmails }) {
                 </div>
             )}
 
-            <div className="h-screen flex bg-gray-50 text-gray-800 overflow-hidden">
-
+            <div className="flex h-screen overflow-hidden bg-gray-50">
                 <div className="flex-1 flex flex-col overflow-hidden">
-
-                    <main className=" flex-1 p-6 overflow-y-auto overflow-x-hidden">
+                    <main className="px-8 pb-16 py-6 flex-1 overflow-y-auto">
                         {isDeleting && <LoadingOverlay action="delete" fullScreen />}
                         {/* {isDeletingMain && <LoadingOverlay action="delete" />}
                         {isArchiving && <LoadingOverlay action="archive" />} */}

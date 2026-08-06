@@ -136,10 +136,18 @@ export default function TopSenders({refetchEmails}) {
         return true;
     });
 
+    function getNoiseColor(color) {
+      if (color === "red") return "bg-red-500";
+      if (color === "orange") return "bg-orange-500";
+      if (color === "yellow") return "bg-yellow-500";
+      if (color === "green") return "bg-green-500";
+      return "bg-gray-400";
+    }
+
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <div className="flex-1 flex flex-col">
-        <main className="px-10 pb-16 py-8 flex-1">
+    <div className="flex h-screen overflow-hidden bg-gray-50">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <main className="px-10 pb-16 py-8 flex-1 overflow-y-auto">
           <h1 className="text-2xl font-bold text-gray-900 m-0">Top Senders</h1>
           <p className="text-sm text-gray-500 mt-1.5 mb-6">
             Ranked by how much noise they add to your inbox
@@ -183,7 +191,7 @@ export default function TopSenders({refetchEmails}) {
 
                     <div className="flex-1 min-w-[160px]">
                         <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                        <div className={`h-full rounded-full bg-${s.color}-500`} style={{ width: `${s.noise_score}%` }} />
+                        <div className={`h-full rounded-full ${getNoiseColor(s.color)}`} style={{ width: `${s.noise_score}%` }} />
                         </div>
                         <div className="text-xs text-gray-400 mt-1">noise {s.noise_score}</div>
                     </div>
