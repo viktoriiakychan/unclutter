@@ -61,10 +61,11 @@ const STRIP_COLORS = {
 };
 
 const RANGE_OPTIONS = [
-  { label: "7 days", days: 7 },
   { label: "30 days", days: 30 },
-  { label: "90 days", days: 90 },
-  { label: "180 days", days: 180 },
+  { label: "3 months", days: 90 },
+  { label: "6 months", days: 180 },
+  { label: "1 year", days: 365 },
+  { label: "2 years", days: 730 },
 ];
 
 function formatHour(hour){
@@ -103,6 +104,14 @@ function InboxStats() {
     fetch(`${API}/auth/me`)
       .then((r) => r.json())
       .then((data) => setUserEmail(data.email));
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API}/sync-range`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.days) setRangeDays(data.days);
+      });
   }, []);
 
   useEffect(() => {

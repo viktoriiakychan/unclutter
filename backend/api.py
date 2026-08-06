@@ -327,6 +327,18 @@ def delete_category(category_id):
 
 from googleapiclient.errors import HttpError
 
+@app.route("/sync-range")
+def get_sync_range():
+    conn = database.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM sync_state WHERE key = 'sync_days'")
+    row = cursor.fetchone()
+    conn.close()
+
+    if row and row[0] != "None":
+        return jsonify({"days": int(row[0])})
+    return jsonify({"days": None})
+
 def background_sync(sync_days=None):
     global sync_progress
     sync_cancelled.clear()
@@ -459,7 +471,24 @@ def start_sync():
         return jsonify({"error": "already running"}), 409
 
     body = request.get_json(silent=True) or {}
-    sync_days = body.get("days")
+    conn = database.get_connection()
+    cursor = conn.cursor()
+
+    if "days" in body:
+        raw_days = body.get("days")
+        sync_days = None if raw_days in (None, "all") else int(raw_days)
+        cursor.execute(
+            "INSERT INTO sync_state (key, value) VALUES ('sync_days', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (str(sync_days),)
+        )
+        conn.commit()
+    else:
+        cursor.execute("SELECT value FROM sync_state WHERE key = 'sync_days'")
+        row = cursor.fetchone()
+        sync_days = int(row[0]) if row and row[0] != "None" else None
+
+    conn.close()
 
     threading.Thread(target=background_sync, args=(sync_days,)).start()
     return jsonify({"started": True})

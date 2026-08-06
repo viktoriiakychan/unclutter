@@ -24,6 +24,8 @@ import Activity from "./components/ActivityLog";
 import InboxStats from "./components/InboxStats";
 import TopSenders from "./components/TopSenders";
 
+const BRAND_BLUE = "#2563eb";
+
 function App() {
   const [phase, setPhase] = useState("checking");
   const [emails, setEmails] = useState([]);
@@ -101,6 +103,7 @@ const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
     const { logged_in } = await res.json();
 
     if (logged_in) {
+      setPhase("restoring");
       await loadEverything();
     } else {
       setPhase("loggedOut");
@@ -114,7 +117,6 @@ const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
   }
 
  async function loadEverything() {
-    setPhase("loading");
     const res = await fetch(`${API}/emails`);
     setEmails(await res.json());
     setPhase("ready");
@@ -130,24 +132,70 @@ const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
     }
 
     triggerSync();
-} 
+  }
 
   if (phase === "checking") return <CenterMessage text="Checking login..." />;
 
   if (phase === "loggedOut") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 relative overflow-hidden">
+        <style>{`
+          @keyframes fadeUp {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes softDrift {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(15px, -10px) scale(1.05); }
+          }
+          .fade-up { animation: fadeUp 0.5s ease-out; }
+          .fade-up-delay { animation: fadeUp 0.5s ease-out 0.15s both; }
+          .blob { animation: softDrift 8s ease-in-out infinite; }
+        `}</style>
+
+        {/* soft background blobs, purely decorative */}
+        <div
+          className="blob absolute -top-24 -left-24 w-72 h-72 rounded-full blur-3xl"
+          style={{ backgroundColor: BRAND_BLUE, opacity: 0.08 }}
+        />
+        <div
+          className="blob absolute -bottom-24 -right-24 w-80 h-80 rounded-full blur-3xl"
+          style={{ backgroundColor: BRAND_BLUE, opacity: 0.06, animationDelay: "2s" }}
+        />
+
+        <div className="fade-up bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center max-w-sm w-full relative">
           <span className="font-bold text-3xl tracking-tight">
-            unclutter<span className="text-blue-600">.</span>
+            unclutter<span style={{ color: BRAND_BLUE }}>.</span>
           </span>
-          <p className="text-gray-500 mt-4 mb-6">Sign in to load your inbox.</p>
+
+          <p className="text-gray-500 mt-3 mb-5 text-sm leading-relaxed">
+            See what's cluttering your inbox, and clear it out in a few clicks.
+          </p>
+
+          <div className="fade-up-delay flex items-center justify-center gap-5 mb-6 text-xs text-gray-400">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: BRAND_BLUE }} />
+              Smart cleanup
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: BRAND_BLUE }} />
+              Inbox insights
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: BRAND_BLUE }} />
+              Auto sync
+            </span>
+          </div>
+
           <button
             onClick={handleLogin}
-            className="px-5 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
+            className="w-full px-5 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-opacity shadow-sm"
+            style={{ backgroundColor: BRAND_BLUE }}
           >
-            Sign In
+            Sign in with Google
           </button>
+
+          
         </div>
       </div>
     );
@@ -158,6 +206,7 @@ const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
   }
 
   if (phase === "loading") return <CenterMessage text="Signing you in..." />;
+  //if (phase === "restoring") return <CenterMessage text="Loading your inbox..." />;
 
   const handleSignIn = () => {
     window.location.href = "/api/auth/login";
