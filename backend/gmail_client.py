@@ -123,19 +123,28 @@ class GmailClient:
         query = f"newer_than:{days}d" if days else None
 
         while True:
-            results = self.service.users().messages().list(
-                userId="me",
-                labelIds=["INBOX"],
-                q=query,
-                maxResults=500,
-                pageToken=page_token
-            ).execute()
+            try:
+                results = self.service.users().messages().list(
+                    userId="me",
+                    labelIds=["INBOX"],
+                    q=query,
+                    maxResults=500,
+                    pageToken=page_token
+                ).execute()
+            except Exception as e:
+                if "rateLimitExceeded" in str(e):
+                    print("Rate limited on list — backing off 60s")
+                    time.sleep(60)
+                    continue  # retry the same page
+                raise
 
             message_ids.extend(results.get("messages", []))
             page_token = results.get("nextPageToken")
 
             if not page_token:
                 break
+
+            time.sleep(1)
 
         return message_ids
 
@@ -187,13 +196,20 @@ class GmailClient:
             internal_date=int(msg.get("internalDate", 0))
         )
 
+    def _save_attachments_from_payload(self, email_id, parts):
+        import database
+        conn = database.get_connection()
+        self._collect_attachments(parts, email_id, conn)
+        conn.commit()
+        conn.close()
+
     def _fetch_full(self, messages, on_progress=None, on_batch=None, should_stop=None):
         full_messages = {}
         failed_ids = []
 
         def handle_response(request_id, response, exception):
             if exception is not None:
-                if "429" in str(exception):
+                if "rateLimitExceeded" in str(exception) or "429" in str(exception):
                     failed_ids.append(request_id)
                 else:
                     print("Failed to fetch", request_id, exception)
@@ -212,13 +228,26 @@ class GmailClient:
                     request_id=message["id"]
                 )
             batch.execute()
-            time.sleep(0.1)
+            #time.sleep(0.5)
+
+            batch_failed = [m["id"] for m in chunk if m["id"] not in full_messages]
+            if len(batch_failed) > len(chunk) // 2:
+                print(f"Rate limited — backing off 30s ({len(batch_failed)}/{len(chunk)} failed)")
+                time.sleep(30)
+            else:
+                time.sleep(3)
 
             if should_stop and should_stop():
                 print("Sync cancelled, discarding this batch")
                 break
 
             batch_emails = [self._parse_message(full_messages[m["id"]]) for m in chunk if m["id"] in full_messages]
+
+            # save attachments from data already in memory
+            for email in batch_emails:
+                if email.attachment_count >= 1 and email.id in full_messages:
+                    payload = full_messages[email.id].get("payload", {})
+                    self._save_attachments_from_payload(email.id, payload.get("parts", []))
 
             if on_batch:
                 on_batch(batch_emails)
@@ -227,14 +256,19 @@ class GmailClient:
 
         # retry anything that got rate-limited, once, after a short cooldown
         if failed_ids:
-            time.sleep(2)
-            retry_batch = self.service.new_batch_http_request(callback=handle_response)
-            for msg_id in failed_ids:
-                retry_batch.add(
-                    self.service.users().messages().get(userId="me", id=msg_id),
-                    request_id=msg_id
-                )
-            retry_batch.execute()
+            print(f"Retrying {len(failed_ids)} rate-limited emails...")
+            time.sleep(30)
+
+            for i in range(0, len(failed_ids), 25):
+                chunk = failed_ids[i:i+25]
+                retry_batch = self.service.new_batch_http_request(callback=handle_response)
+                for msg_id in chunk:
+                    retry_batch.add(
+                        self.service.users().messages().get(userId="me", id=msg_id),
+                        request_id=msg_id
+                    )
+                retry_batch.execute()
+                time.sleep(3)
 
             retried_emails = [self._parse_message(full_messages[mid]) for mid in failed_ids if mid in full_messages]
             if on_batch and retried_emails:
@@ -383,15 +417,23 @@ class GmailClient:
 
             self._collect_attachments(part.get("parts", []), email_id, conn)
 
-    def sync_attachments(self, conn, email_id):
-        msg = self.service.users().messages().get(
-            userId="me", id=email_id, format="full"
-        ).execute()
+    def sync_attachments(self, email_id):
+        import database
+        try:
+            msg = self.service.users().messages().get(
+                userId="me", id=email_id, format="full"
+            ).execute()
+        except Exception as e:
+            if "rateLimitExceeded" in str(e):
+                print(f"Rate limited on attachment sync for {email_id}, skipping")
+                return
+            raise
 
         payload = msg.get("payload", {})
+        conn = database.get_connection()
         self._collect_attachments(payload.get("parts", []), email_id, conn)
-
         conn.commit()
+        conn.close()
 
     def get_history(self, start_history_id):
         changes = {"added": [], "deleted": [], "labels_added": [], "labels_removed": []}

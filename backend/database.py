@@ -4,7 +4,7 @@ from models import Email
 DB_FILE = "emails.db"
 
 def get_connection():
-    conn = sqlite3.connect(DB_FILE, timeout=10)
+    conn = sqlite3.connect(DB_FILE, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
 

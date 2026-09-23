@@ -1,0 +1,57 @@
+[33md43d3cb[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge branch 'main' of https://github.com/viktoriiakychan/email-cleaner
+[33m677e630[m fix bugs
+[33m81c28a1[m Add initial README for unclutter web app
+[33m3ab9e1e[m fix syncing & appearence
+[33m43c588e[m fix syncing and showing to the user
+[33md82735f[m add background sync & fix it
+[33m8239a20[m small details
+[33m21940bc[m finish off top senders + polish the rest
+[33mb3ebe0a[m add functioning unsubscribe in top senders & dashboard
+[33m3b988a5[m change noise score algorithm + add colours for noise score + fix the top stat cards
+[33mf00474d[m add rough work on top senders - page render, health score + noise scores
+[33m5613b68[m fix bug deleting and undoing
+[33md646c41[m add some attachment stats extra
+[33m22861e6[m add pie chart attachmet type breakdown
+[33mc7eb720[m add some attachment stats
+[33me3dd197[m add the email volume stats
+[33m5fa0676[m add the heatmap stats
+[33m8b11901[m add newsletter as a category
+[33ma925f54[m add filtering by number of days on inbox stats page
+[33mb12b4ce[m fix the syncing of emails + increase the speed of sync
+[33m1e7d0f4[m add a part of inbox stats page
+[33m0769632[m fix unarchive + enhance dashboard ux and ui of email selection
+[33maabc40e[m develop activity page
+[33m07d919b[m add test of activity page
+[33mb302555[m add selective deleting on Clean Up page & fix animation
+[33m359cf50[m add progress on filtering for Clean Up page
+[33mc05cc4a[m add suggest to delete
+[33m5f2166e[m get top inbox offender test
+[33m779f35a[m add header into a separate file
+[33m96c2acf[m add cleanup page
+[33m8cbe67d[m inbox health score preview in dashboard
+[33mb27770d[m enhance archive & delete buttons button
+[33mbf58b09[m add archive button
+[33mc504b35[m add delete confirmation windom & enhance delete button
+[33ma58ca28[m add delete button
+[33m1b84454[m break up into files + render the page when get userEmail
+[33mc081935[m add dashboard unsubscribe
+[33m941da83[m by category
+[33me9aacff[m add search by sender + the logged in user at the top + email name in dashboard
+[33mb84bbfd[m add filtering the emails in dashboard + email age
+[33mecd7cc2[m fix the design + scroll through email + 4 stat cards
+[33m22c374b[m add syncing the emails and increase the speed
+[33me127046[m add login flow to backend and frontend
+[33m8d35eb3[m add frontend parts + try fix the emails
+[33m4007e6f[m add internal_date to sort in database
+[33m405bd00[m redo last commit main.py
+[33mefdf549[m Add SQLite storage with save/load and Gmail sync
+[33m7889df2[m Add SQLite storage with save/load and Gmail sync
+[33maa76859[m add analytics, token caching and batch fetching
+[33mab6b3f1[m add get unsubscribe link + remove code duplicates
+[33m39acf03[m add int input checks
+[33m407a156[m add clean up by sender
+[33ma19158e[m add reading and archiving newsletter emails
+[33m5bc636f[m add analytics, token caching and batch fetching
+[33m959db4e[m Add a menu and impelent it for the [1] - Read emails from the last N days
+[33mebdf593[m Add a basic read unread emails - (by days)
+[33m4c3fdd9[m Initial commit

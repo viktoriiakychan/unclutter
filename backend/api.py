@@ -3,6 +3,7 @@ from dataclasses import asdict
 from flask_cors import CORS
 from gmail_client import GmailClient
 import analytics as an
+import time
 
 from flask import request
 import database
@@ -55,11 +56,9 @@ def sync():
     emails = client.get_recent_emails()
     database.save_emails(emails)
 
-    conn = database.get_connection()
     for email in emails:
         if email.attachment_count >= 1:
-            client.sync_attachments(conn, email.id)
-    conn.close()
+            client.sync_attachments(email.id)
 
     return jsonify({"synced": len(emails)})
 
@@ -189,11 +188,10 @@ def unarchive_emails():
 @app.route("/stats")
 def get_stats():
     days = request.args.get("days", 30, type=int)
-    
     conn = database.get_connection()
     unread_stats = an.get_unread_stats(conn, days)
 
-    return jsonify({
+    result = {
         "totalEmails": an.get_total_email_count(conn, days),
         "unread": unread_stats["unread"],
         "read": unread_stats["read"],
@@ -209,13 +207,16 @@ def get_stats():
         "totalAttachmentSize": an.get_total_attachment_size(conn, days),
         "largestAttachments": an.get_largest_attachment_list(conn, days),
         "attachmentBreakdown": an.get_attachment_type_breakdown(conn, days)
-    })
+    }
+    conn.close()
+    return jsonify(result)
 
 @app.route("/noise-scores")
 def get_noise_scores():
     conn = database.get_connection()
 
     scores = an.get_sender_noise_scores(conn)
+    conn.close()
     return jsonify(scores)
 
 @app.route("/health-score")
@@ -223,12 +224,15 @@ def get_health_score():
     conn = database.get_connection()
     
     scores = an.get_inbox_health_score(conn)
+    conn.close()
     return jsonify(scores)
 
 @app.route("/worst-offender")
 def worst_offender():
     conn = database.get_connection()
-    return jsonify(an.get_worst_offender(conn))
+    result = an.get_worst_offender(conn)
+    conn.close()
+    return jsonify(result)
 
 
 @app.route("/dismiss-sender", methods=["POST"])
@@ -344,17 +348,24 @@ def background_sync(sync_days=None):
     sync_cancelled.clear()
     sync_progress["running"] = True
     sync_progress["synced"] = 0
-    sync_progress["total"] = 0 
+    sync_progress["total"] = 0
 
-    conn = None
     try:
+        # quick read for history_id
         conn = database.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM sync_state WHERE key = 'history_id'")
-        row = cursor.fetchone()
+        row = conn.execute("SELECT value FROM sync_state WHERE key = 'history_id'").fetchone()
+        conn.close()
 
         client = GmailClient()
         client.connect()
+
+        try:
+            client.get_profile()
+        except Exception as e:
+            if "rateLimitExceeded" in str(e):
+                print("Still rate-limited, skipping this sync")
+                return
+            raise
 
         needs_full_sync = row is None
 
@@ -371,22 +382,21 @@ def background_sync(sync_days=None):
                     database.save_emails(email_objs)
                     for email in email_objs:
                         if email.attachment_count >= 1:
-                            client.sync_attachments(conn, email.id)
+                            client.sync_attachments(email.id)
 
+                conn = database.get_connection()
+                cursor = conn.cursor()
                 for item in changes["labels_added"]:
                     label_ids = item.get("labelIds", [])
                     msg_id = item["message"]["id"]
 
                     if "UNREAD" in label_ids:
                         cursor.execute("UPDATE emails SET unread = 1 WHERE id = ?", (msg_id,))
-
                     if "TRASH" in label_ids:
                         database.delete_emails([msg_id])
-
                     if "INBOX" in label_ids:
                         cursor.execute("SELECT id FROM emails WHERE id = ?", (msg_id,))
                         exists = cursor.fetchone()
-
                         if exists:
                             database.mark_unarchived([msg_id])
                         else:
@@ -395,7 +405,7 @@ def background_sync(sync_days=None):
                                 database.save_emails(restored)
                                 for email in restored:
                                     if email.attachment_count >= 1:
-                                        client.sync_attachments(conn, email.id)
+                                        client.sync_attachments(email.id)
 
                 for item in changes["labels_removed"]:
                     label_ids = item.get("labelIds", [])
@@ -409,6 +419,9 @@ def background_sync(sync_days=None):
                     "UPDATE sync_state SET value = ? WHERE key = 'history_id'",
                     (new_history_id,)
                 )
+                conn.commit()
+                conn.close()
+
                 sync_progress["total"] = (
                     len(changes["added"]) + len(changes["deleted"])
                     + len(changes["labels_added"]) + len(changes["labels_removed"])
@@ -416,6 +429,9 @@ def background_sync(sync_days=None):
                 sync_progress["synced"] = sync_progress["total"]
 
             except HttpError as e:
+                if "rateLimitExceeded" in str(e):
+                    print("Rate limited during incremental sync, will retry next time")
+                    return  # just stop, don't fall back to full sync
                 print("Stale history_id, falling back to full sync:", e)
                 needs_full_sync = True
 
@@ -424,18 +440,19 @@ def background_sync(sync_days=None):
             message_stubs = client.list_all_message_ids(days=sync_days)
             sync_progress["total"] = len(message_stubs)
 
+            saved_count = {"value": 0}
+
             def update_progress(count):
-                sync_progress["synced"] = count
+                pass  # don't use this for display anymore
 
             def save_batch(batch):
                 if sync_cancelled.is_set():
                     return
                 database.save_emails(batch)
-                for email in batch:
-                    if email.attachment_count >= 1:
-                        client.sync_attachments(conn, email.id)
+                saved_count["value"] += len(batch)
+                sync_progress["synced"] = saved_count["value"]
 
-            emails = client._fetch_full(
+            client._fetch_full(
                 message_stubs,
                 on_progress=update_progress,
                 on_batch=save_batch,
@@ -446,24 +463,27 @@ def background_sync(sync_days=None):
                 print("Sync was cancelled — skipping history checkpoint")
                 return
 
-            profile = client.get_profile()
-            cursor.execute("DELETE FROM sync_state WHERE key = 'history_id'")
-            cursor.execute(
-                "INSERT INTO sync_state (key, value) VALUES ('history_id', ?)",
-                (profile["historyId"],)
-            )
-
-        conn.commit()
+            try:
+                profile = client.get_profile()
+                conn = database.get_connection()
+                conn.execute("DELETE FROM sync_state WHERE key = 'history_id'")
+                conn.execute(
+                    "INSERT INTO sync_state (key, value) VALUES ('history_id', ?)",
+                    (profile["historyId"],)
+                )
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                print("Failed to save history checkpoint:", e)
 
     except Exception as e:
         print("background_sync failed:", e)
-        if conn:
-            conn.rollback()
 
     finally:
-        if conn:
-            conn.close()
         sync_progress["running"] = False
+        sync_progress["synced"] = 0
+        sync_progress["total"] = 0
+        sync_progress["type"] = None
 
 @app.route("/sync/start", methods=["POST"])
 def start_sync():
