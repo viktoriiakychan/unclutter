@@ -2,6 +2,7 @@ import os
 
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from email.utils import parseaddr
@@ -28,10 +29,18 @@ class GmailClient:
             raise RuntimeError("not_logged_in")
         
         creds = Credentials.from_authorized_user_file("token.json", self.SCOPES)
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+        if not creds.valid:
+            if not creds.refresh_token:
+                raise RuntimeError("not_logged_in")
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                # token is dead (7-day expiry or revoked), delete it so we show login
+                os.remove("token.json")
+                raise RuntimeError("not_logged_in")
             with open("token.json", "w") as f:
                 f.write(creds.to_json())
+                
         self.creds = creds
         self.service = build(
             "gmail", 
