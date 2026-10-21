@@ -16,3 +16,10 @@ env/
 token.json
 credentials.json
 __pycache__/
+
+*.db
+*.db-shm
+*.db-wal
+*.exe
+node_modules/
+dist/
