@@ -281,6 +281,15 @@ def get_activity_log(limit=100):
         for row in rows
     ]
 
+def remove_from_activity_log(ids):
+    conn = get_connection()
+    for i in range(0, len(ids), 900):
+        chunk = ids[i:i + 900]
+        ph = ",".join("?" for _ in chunk)
+        conn.execute(f"DELETE FROM activity_log WHERE email_id IN ({ph})", chunk)
+    conn.commit()
+    conn.close()
+
 def restore_from_activity_log(ids):
     conn = get_connection()
     cursor = conn.cursor()
@@ -303,7 +312,7 @@ def restore_from_activity_log(ids):
                 row[7], row[8], row[9], row[10], row[11], row[12], row[13]
             ))
             # remove the log entry now that it's been restored
-            cursor.execute("DELETE FROM activity_log WHERE id = ?", (row[0],))
+            cursor.execute("DELETE FROM activity_log WHERE email_id = ?", (email_id,))
 
     conn.commit()
     conn.close()

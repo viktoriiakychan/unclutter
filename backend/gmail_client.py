@@ -289,7 +289,7 @@ class GmailClient:
                 body["addLabelIds"] = add
             if remove:
                 body["removeLabelIds"] = remove
-                
+
             self.service.users().messages().batchModify(
                 userId="me", body=body
             ).execute(num_retries=5)
@@ -314,6 +314,10 @@ class GmailClient:
     def unarchive(self, email_ids):
         self._batch_modify(email_ids, add=["INBOX"])
         print(f"Unarchived {len(email_ids)} emails.")
+
+    # def mark_as_unread(self, email_ids):
+    #     self._batch_modify(email_ids, add=["UNREAD"])
+    #     print(f"Marked {len(email_ids)} emails as unread.")
 
     def get_profile(self):
         profile = self.service.users().getProfile(userId="me").execute()

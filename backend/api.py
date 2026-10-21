@@ -180,8 +180,8 @@ def unarchive_emails():
         return jsonify({"error": "not_logged_in"}), 401
 
     client.unarchive(ids)
-
     database.mark_unarchived(ids)
+    database.remove_from_activity_log(ids) 
 
     return jsonify({"unarchived": len(ids)})
 
