@@ -43,6 +43,10 @@ def create_table():
         )
     """)
 
+    try:
+        cursor.execute("ALTER TABLE emails ADD COLUMN one_click INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # column already exists
     conn.commit()
     conn.close()
 
@@ -114,8 +118,8 @@ def save_emails(emails):
         cursor.execute("""
             INSERT INTO emails
             (id, thread_id, sender_name, sender_email, subject, date,
-             unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date, one_click)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 thread_id=excluded.thread_id,
                 sender_name=excluded.sender_name,
@@ -128,12 +132,14 @@ def save_emails(emails):
                 attachment_size=excluded.attachment_size,
                 is_newsletter=excluded.is_newsletter,
                 unsubscribe=excluded.unsubscribe,
-                internal_date=excluded.internal_date
+                internal_date=excluded.internal_date,
+                one_click=excluded.one_click
         """, (
             email.id, email.thread_id, email.sender_name, email.sender_email,
             email.subject, email.date, 1 if email.unread else 0, email.category,
             email.attachment_count, email.attachment_size,
-            1 if email.is_newsletter else 0, email.unsubscribe, email.internal_date
+            1 if email.is_newsletter else 0, email.unsubscribe, email.internal_date,
+            1 if email.one_click else 0
         ))
 
     conn.commit()
@@ -308,8 +314,29 @@ def clear_all_local_data():
     cursor.execute("DELETE FROM emails")
     cursor.execute("DELETE FROM attachments")
     cursor.execute("DELETE FROM sync_state")
-    cursor.execute("DELETE FROM dismissed_senders")
     cursor.execute("DELETE FROM activity_log")
+
+    conn.commit()
+    conn.close()
+
+def dismiss_sender_in_db(sender_email):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # find their most recent email right now
+    row = cursor.execute(
+        "SELECT MAX(internal_date) FROM emails WHERE sender_email = ?",
+        (sender_email,)
+    ).fetchone()
+    latest_date = row[0]
+
+    cursor.execute("""
+        INSERT INTO dismissed_senders (sender_email, last_seen_email_date)
+        VALUES (?, ?)
+        ON CONFLICT(sender_email) DO UPDATE SET
+            dismissed_at = CURRENT_TIMESTAMP,
+            last_seen_email_date = excluded.last_seen_email_date
+    """, (sender_email, latest_date))
 
     conn.commit()
     conn.close()

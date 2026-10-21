@@ -57,13 +57,18 @@ function App() {
 
 
 
+  const wasRunning = useRef(false);
+
   useEffect(() => {
     const interval = setInterval(async () => {
-      const res = await fetch(`${API}/sync/progress`);
-      const progress = await res.json();
-      if (progress.running) {
-        refetchEmails();
-      }
+        const res = await fetch(`${API}/sync/progress`);
+        const progress = await res.json();
+
+        // refetch while running, AND once more on the check right after it stops
+        if (progress.running || wasRunning.current) {
+            refetchEmails();
+        }
+        wasRunning.current = progress.running;
     }, 2000);
 
     return () => clearInterval(interval);

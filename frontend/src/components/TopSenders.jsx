@@ -82,24 +82,27 @@ export default function TopSenders({refetchEmails}) {
     const [userEmail, setUserEmail] = useState("");
 
 
-    async function handleUnsubscribeClick(e, sender_email, link) {
-        e.preventDefault(); // stop the <a> from navigating immediately
-
-        try {
-            await fetch(`${API}/dismiss-sender`, {
+    async function handleUnsubscribeClick(sender_email) {
+        const res = await fetch(`${API}/unsubscribe`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sender_email }),
-            });
-        } catch (err) {
-            console.error("Failed to dismiss sender:", err);
-        }
+        });
+        const data = await res.json();
 
-        window.open(link, "_blank", "noopener,noreferrer");
+        if (data.method === "link") {
+            // sender doesn't support one-click: user finishes on their site
+            window.open(data.url, "_blank", "noopener,noreferrer");
+            await fetch(`${API}/dismiss-sender`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sender_email }),
+            });
+        }
 
         // remove from local list immediately so the UI updates without a refetch
         setNoiseScores((prev) => prev.filter((s) => s.sender_email !== sender_email));
-        }
+    }
 
     useEffect(()=> {
         fetch(`${API}/health-score`)
@@ -200,13 +203,12 @@ export default function TopSenders({refetchEmails}) {
                     <div className="w-[90px] text-xs text-gray-500 text-right">{s.unread_rate}% unread</div>
 
                     {s.can_unsubscribe ? (
-                        <a 
-                           href={s.unsubscribe_link}
-                            onClick={(e) => handleUnsubscribeClick(e, s.sender_email, s.unsubscribe_link)}
+                        <button
+                            onClick={() => handleUnsubscribeClick(s.sender_email)}
                             className="px-4 py-2 rounded-lg text-[13px] font-semibold border border-orange-300 bg-orange-100 text-orange-700 cursor-pointer whitespace-nowrap hover:bg-orange-200"
-                            >
+                        >
                             Unsubscribe
-                            </a>
+                        </button>
                         ) : (
                         <div className="px-4 py-2 w-[105px]" />
                         )}

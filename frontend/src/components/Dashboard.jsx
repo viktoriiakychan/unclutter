@@ -105,23 +105,23 @@
         }
 
     
-        async function handleUnsubscribeClick(e, sender_email, link) {
-            e.preventDefault(); // stop the <a> from navigating immediately
+        // async function handleUnsubscribeClick(e, sender_email, link) {
+        //     e.preventDefault(); // stop the <a> from navigating immediately
 
-            try {
-                await fetch(`${API}/dismiss-sender`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sender_email }),
-                });
-            } catch (err) {
-                console.error("Failed to dismiss sender:", err);
-            }
+        //     try {
+        //         await fetch(`${API}/dismiss-sender`, {
+        //         method: "POST",
+        //         headers: { "Content-Type": "application/json" },
+        //         body: JSON.stringify({ sender_email }),
+        //         });
+        //     } catch (err) {
+        //         console.error("Failed to dismiss sender:", err);
+        //     }
 
-            window.open(link, "_blank", "noopener,noreferrer");
-            setUnsubscribeList((prev) => prev.filter((item) => item.sender_email !== sender_email));
+        //     window.open(link, "_blank", "noopener,noreferrer");
+        //     setUnsubscribeList((prev) => prev.filter((item) => item.sender_email !== sender_email));
 
-        }
+        // }
 
         const filteredEmails = emails.filter((email) => {
             let matchesFilter = true;
@@ -267,6 +267,27 @@
             } else {
                 setSelectedIds(filteredEmails.map(e => e.id));
             }
+        }
+
+        async function handleUnsubscribeClick(sender_email) {
+            const res = await fetch(`${API}/unsubscribe`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sender_email }),
+            });
+            const data = await res.json();
+
+            if (data.method === "link") {
+                // sender doesn't support one-click: user finishes on their site
+                window.open(data.url, "_blank", "noopener,noreferrer");
+                await fetch(`${API}/dismiss-sender`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ sender_email }),
+                });
+            }
+
+            setUnsubscribeList((prev) => prev.filter((item) => item.sender_email !== sender_email));
         }
 
     return (
@@ -652,13 +673,12 @@
 
                                             <div className="flex items-center gap-3 flex-shrink-0">
                                                 <span className="w-6 text-right text-xs text-gray-400">{item.count}</span>
-                                                <a
-                                                    href={item.unsubscribe}
-                                                    onClick={(e) => handleUnsubscribeClick(e, item.sender_email, item.unsubscribe)}
+                                                <button
+                                                    onClick={() => handleUnsubscribeClick(item.sender_email)}
                                                     className="px-2 py-1 rounded-lg border border-blue-400 text-blue-500 text-xs font-medium hover:bg-blue-50"
                                                 >
                                                     Unsubscribe
-                                                </a>
+                                                </button>
                                             </div>
                                         </div>
                                     ))}

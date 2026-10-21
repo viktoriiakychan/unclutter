@@ -9,6 +9,7 @@ from email.utils import parseaddr
 import time
 from database import load_emails
 import re
+from analytics import get_unsubscribe_link
 
 from models import Email
 
@@ -164,6 +165,7 @@ class GmailClient:
 
         sender = subject = date = unsubscribe = ""
         is_newsletter = False
+        one_click = False  
 
         for header in headers:
             if header["name"] == "From":
@@ -175,6 +177,8 @@ class GmailClient:
             elif header["name"] == "List-Unsubscribe":
                 is_newsletter = True
                 unsubscribe = header["value"]
+            elif header["name"].lower() == "list-unsubscribe-post":
+                one_click = "one-click" in header["value"].lower() 
 
         attachment_count, attachment_size = self.attachment_stats(payload.get("parts", []))
         sender_name, sender_email = parseaddr(sender)
@@ -203,7 +207,8 @@ class GmailClient:
             attachment_size=attachment_size,
             is_newsletter=is_newsletter,
             unsubscribe=unsubscribe,
-            internal_date=int(msg.get("internalDate", 0))
+            internal_date=int(msg.get("internalDate", 0)),
+            one_click=one_click
         )
 
     def _save_attachments_from_payload(self, email_id, parts):
@@ -353,13 +358,6 @@ class GmailClient:
 
         return self._fetch_full(new_messages)
 
-    def clean_unsubscribe(self, raw):
-        if not raw:
-            return None
-        match = re.search(r'<\s*(https?://[^>]+?)\s*>', raw)
-        if match:
-            return match.group(1).strip()
-        return None
 
     def get_unsubscribe_links(self, limit=100):
         emails = load_emails()
@@ -378,7 +376,7 @@ class GmailClient:
                 result.append({
                     "sender_name": email.sender_name,
                     "sender_email": email.sender_email,
-                    "unsubscribe": self.clean_unsubscribe(email.unsubscribe),
+                    "unsubscribe": get_unsubscribe_link(email.unsubscribe),
                     "count": count,
                     "latest_email_date": latest_date,
                 })

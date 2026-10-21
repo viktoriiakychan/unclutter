@@ -56,7 +56,7 @@ def get_unsubscribe_link(unsubscribe_header):
         # remove whitespace and < >
         cleaned = part.strip().strip("<>").strip()
 
-        if cleaned.startswith("http"):
+        if cleaned.startswith("https://"):
             return cleaned
 
     return None

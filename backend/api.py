@@ -11,6 +11,8 @@ import threading
 
 import os
 
+import urllib.request
+
 app = Flask(__name__) # create the web application 
 CORS(app)
 
@@ -231,32 +233,44 @@ def worst_offender():
     return jsonify(result)
 
 
+@app.route("/unsubscribe", methods=["POST"])
+def unsubscribe():
+    sender_email = request.get_json().get("sender_email")
+
+    # newest email from this sender that has an unsubscribe link
+    conn = database.get_connection()
+    row = conn.execute("""
+        SELECT unsubscribe, one_click FROM emails
+        WHERE sender_email = ? AND unsubscribe != ''
+        ORDER BY internal_date DESC LIMIT 1
+    """, (sender_email,)).fetchone()
+    conn.close()
+
+    link = an.get_unsubscribe_link(row[0]) if row else None
+    if not link:
+        return jsonify({"method": "none"}), 404
+
+    if row[1]:  # sender supports one-click
+        try:
+            req = urllib.request.Request(
+                link,
+                data=b"List-Unsubscribe=One-Click",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=10)
+            dismiss_sender_in_db(sender_email)
+            return jsonify({"method": "one_click"})
+        except Exception as e:
+            print("One-click failed, falling back to link:", e)
+
+    return jsonify({"method": "link", "url": link})
+
 @app.route("/dismiss-sender", methods=["POST"])
 def dismiss_sender():
     sender_email = request.get_json().get("sender_email")
-
-    conn = database.get_connection()
-    cursor = conn.cursor()
-
-    # find their most recent email right now
-    row = cursor.execute(
-        "SELECT MAX(internal_date) FROM emails WHERE sender_email = ?",
-        (sender_email,)
-    ).fetchone()
-    latest_date = row[0]
-
-    cursor.execute("""
-        INSERT INTO dismissed_senders (sender_email, last_seen_email_date)
-        VALUES (?, ?)
-        ON CONFLICT(sender_email) DO UPDATE SET
-            dismissed_at = CURRENT_TIMESTAMP,
-            last_seen_email_date = excluded.last_seen_email_date
-    """, (sender_email, latest_date))
-
-    conn.commit()
-    conn.close()
+    database.dismiss_sender_in_db(sender_email)
     return jsonify({"dismissed": True})
-
 
 @app.route("/categories", methods=["GET"])
 def get_categories():
@@ -474,6 +488,10 @@ def background_sync(sync_days=None):
 
     except Exception as e:
         print("background_sync failed:", e)
+        
+        sync_progress["synced"] = sync_progress["total"]
+        time.sleep(1.5) 
+
 
     finally:
         sync_progress["running"] = False
