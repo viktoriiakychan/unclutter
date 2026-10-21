@@ -66,6 +66,7 @@ class GmailClient:
                     f.write(creds.to_json())
                 return True
             except Exception:
+                os.remove("token.json")
                 return False
 
         # no token or expired with no refresh token        

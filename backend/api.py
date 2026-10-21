@@ -56,10 +56,6 @@ def sync():
     emails = client.get_recent_emails()
     database.save_emails(emails)
 
-    for email in emails:
-        if email.attachment_count >= 1:
-            client.sync_attachments(email.id)
-
     return jsonify({"synced": len(emails)})
 
 @app.route("/auth/me")
@@ -374,15 +370,14 @@ def background_sync(sync_days=None):
             try:
                 changes, new_history_id = client.get_history(row[0])
 
-                for item in changes["deleted"]:
-                    database.delete_emails([item["message"]["id"]])
+                deleted_ids = list({item["message"]["id"] for item in changes["deleted"]})
+                if deleted_ids:
+                    database.delete_emails(deleted_ids)
 
-                for item in changes["added"]:
-                    email_objs = client._fetch_full([item["message"]])
+                added_ids = list({item["message"]["id"] for item in changes["added"]})
+                if added_ids:
+                    email_objs = client._fetch_full([{"id": i} for i in added_ids])
                     database.save_emails(email_objs)
-                    for email in email_objs:
-                        if email.attachment_count >= 1:
-                            client.sync_attachments(email.id)
 
                 conn = database.get_connection()
                 cursor = conn.cursor()
@@ -393,19 +388,19 @@ def background_sync(sync_days=None):
                     if "UNREAD" in label_ids:
                         cursor.execute("UPDATE emails SET unread = 1 WHERE id = ?", (msg_id,))
                     if "TRASH" in label_ids:
+                        conn.commit()
                         database.delete_emails([msg_id])
                     if "INBOX" in label_ids:
                         cursor.execute("SELECT id FROM emails WHERE id = ?", (msg_id,))
                         exists = cursor.fetchone()
                         if exists:
+                            conn.commit()
                             database.mark_unarchived([msg_id])
                         else:
+                            conn.commit()
                             restored = client._fetch_full([{"id": msg_id}])
                             if restored:
                                 database.save_emails(restored)
-                                for email in restored:
-                                    if email.attachment_count >= 1:
-                                        client.sync_attachments(email.id)
 
                 for item in changes["labels_removed"]:
                     label_ids = item.get("labelIds", [])
@@ -413,6 +408,7 @@ def background_sync(sync_days=None):
                     if "UNREAD" in label_ids:
                         cursor.execute("UPDATE emails SET unread = 0 WHERE id = ?", (msg_id,))
                     if "INBOX" in label_ids:
+                        conn.commit()
                         database.mark_archived([msg_id])
 
                 cursor.execute(
