@@ -191,51 +191,39 @@ def get_existing_ids():
 
 def delete_emails(ids):
     conn = get_connection()
-    cursor = conn.cursor()
-
-    for email_id in ids:
-        row = conn.execute("SELECT * FROM emails WHERE id = ?", (email_id,)).fetchone()
-
-        if row:
-            cursor.execute("""
-                INSERT INTO activity_log
-                (email_id, thread_id, sender_name, sender_email, subject, date,
-                 unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date, action_type)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                row[0], row[1], row[2], row[3], row[4], row[5],
-                row[6], row[7], row[8], row[9], row[10], row[11], row[12],
-                "deleted"
-            ))
-
-    placeholders = ",".join("?" for _ in ids)
-    cursor.execute(f"DELETE FROM emails WHERE id IN ({placeholders})", ids)
-
+    
+    for i in range(0, len(ids), 900): # loop over chuncks = faster, 900 cos sqllite only allows 999 ? marks in one query 
+        chunk = ids[i:i + 900]
+        ph = ",".join("?" for _ in chunk) # placeholder 
+        conn.execute(f"""
+            INSERT INTO activity_log (email_id, thread_id, sender_name, sender_email, subject, date,
+                unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
+                internal_date, action_type)
+            SELECT id, thread_id, sender_name, sender_email, subject, date,
+                unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
+                internal_date, 'deleted'
+            FROM emails WHERE id IN ({ph})
+        """, chunk)
+        conn.execute(f"DELETE FROM emails WHERE id IN ({ph})", chunk)
     conn.commit()
     conn.close()
 
+
 def mark_archived(ids):
     conn = get_connection()
-    cursor = conn.cursor()
-
-    for email_id in ids:
-        row = conn.execute("SELECT * FROM emails WHERE id = ?", (email_id,)).fetchone()
-
-        if row:
-            cursor.execute("""
-                INSERT INTO activity_log
-                (email_id, thread_id, sender_name, sender_email, subject, date,
-                 unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe, internal_date, action_type)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                row[0], row[1], row[2], row[3], row[4], row[5],
-                row[6], row[7], row[8], row[9], row[10], row[11], row[12],
-                "archived"
-            ))
-
-    placeholders = ",".join("?" for _ in ids)
-    cursor.execute(f"UPDATE emails SET is_archived = 1 WHERE id IN ({placeholders})", ids)
-
+    for i in range(0, len(ids), 900):
+        chunk = ids[i:i + 900]
+        ph = ",".join("?" for _ in chunk)
+        conn.execute(f"""
+            INSERT INTO activity_log (email_id, thread_id, sender_name, sender_email, subject, date,
+                unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
+                internal_date, action_type)
+            SELECT id, thread_id, sender_name, sender_email, subject, date,
+                unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
+                internal_date, 'archived'
+            FROM emails WHERE id IN ({ph}) AND is_archived = 0
+        """, chunk)
+        conn.execute(f"UPDATE emails SET is_archived = 1 WHERE id IN ({ph})", chunk)
     conn.commit()
     conn.close()
 
