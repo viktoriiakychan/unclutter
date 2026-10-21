@@ -281,58 +281,38 @@ class GmailClient:
         message_ids=self.list_all_message_ids()
         return self._fetch_full(message_ids, on_progress=on_progress)
 
-    def mark_as_read(self, email_ids):
-        for email_id in email_ids:
-            self.service.users().messages().modify(
-                userId="me",
-                id=email_id,
-                body={"removeLabelIds": ["UNREAD"]}
-            ).execute()
+    def _batch_modify(self, email_ids, add=None, remove=None):
+        # Gmail allows max 1000 ids per batchModify call, so split into chunks
+        for i in range(0, len(email_ids), 1000):
+            body = {"ids": email_ids[i:i + 1000]}
+            if add:
+                body["addLabelIds"] = add
+            if remove:
+                body["removeLabelIds"] = remove
+                
+            self.service.users().messages().batchModify(
+                userId="me", body=body
+            ).execute(num_retries=5)
 
+
+    def mark_as_read(self, email_ids):
+        self._batch_modify(email_ids, remove=["UNREAD"])
         print(f"Marked {len(email_ids)} emails as read.")
 
     def archive(self, email_ids):
-        for email_id in email_ids:
-            self.service.users().messages().modify(
-                userId="me",
-                id=email_id,
-                body={"removeLabelIds": ["INBOX"]}
-            ).execute()
-
+        self._batch_modify(email_ids, remove=["INBOX"])
         print(f"Archived {len(email_ids)} emails.")
 
     def trash(self, email_ids):
-        for email_id in email_ids:
-            self.service.users().messages().trash(
-                userId="me",
-                id=email_id
-            ).execute()
-
+        self._batch_modify(email_ids, add=["TRASH"])
         print(f"Moved {len(email_ids)} emails to Trash.")
 
     def untrash(self, email_ids):
-        for email_id in email_ids:
-            self.service.users().messages().untrash(
-                userId="me",
-                id=email_id
-            ).execute()
-
-            self.service.users().messages().modify(
-                userId="me",
-                id=email_id,
-                body={"addLabelIds": ["INBOX"]}
-            ).execute()
-
+        self._batch_modify(email_ids, add=["INBOX"], remove=["TRASH"])
         print(f"Moved {len(email_ids)} emails from Trash.")
 
     def unarchive(self, email_ids):
-        for email_id in email_ids:
-            self.service.users().messages().modify(
-                userId="me",
-                id=email_id,
-                body={"addLabelIds": ["INBOX"]}
-            ).execute()
-
+        self._batch_modify(email_ids, add=["INBOX"])
         print(f"Unarchived {len(email_ids)} emails.")
 
     def get_profile(self):
