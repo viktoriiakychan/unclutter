@@ -53,7 +53,7 @@ function SyncStatus({ lastSynced, syncing, now }) {
   );
 }
 
-export default function Header({ userEmail, userName, lastSynced, syncing, onSyncNow }) {
+export default function Header({ userEmail, userName, lastSynced, syncing, onSyncNow, title, subtitle }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 30000);
@@ -64,14 +64,14 @@ export default function Header({ userEmail, userName, lastSynced, syncing, onSyn
   const firstName = userName ? userName.split(" ")[0] : null;
 
   return (
-    <header className="shrink-0 px-8 pt-7 pb-3 bg-gray-50">
+    <header className="shrink-0 px-8 pt-7 pb-3 bg-canvas">
       <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-400">
         {formatToday(today)}
       </p>
 
       <div className="flex items-center justify-between gap-4 mt-1">
         <h1 className="text-2xl font-bold tracking-tight text-gray-950 truncate">
-          {firstName ? `Hey ${firstName}!` : "Hey there!"}
+          {title ?? (firstName ? `Hey ${firstName}!` : "Hey there!")}
         </h1>
 
         {userEmail && (
@@ -90,6 +90,7 @@ export default function Header({ userEmail, userName, lastSynced, syncing, onSyn
           </div>
         )}
       </div>
+      {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
     </header>
   );
 }

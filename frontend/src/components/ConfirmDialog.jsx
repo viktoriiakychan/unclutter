@@ -90,7 +90,7 @@ export default function ConfirmDialog({ open, action, count, unreadCount = 0, on
           <button
             onClick={onCancel}
             autoFocus // Enter on a dialog that just opened = Cancel, the safe choice
-            className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+            className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
           >
             Cancel
           </button>

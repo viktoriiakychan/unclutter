@@ -45,7 +45,7 @@ export default function WorstOffenderCard({ offender, inboxTotal, onCleanNow, on
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 bg-gray-50 rounded-xl px-4 py-3 mt-4">
+      <div className="grid grid-cols-3 gap-4 bg-canvas rounded-xl px-4 py-3 mt-4">
         <Stat label="Emails" value={offender.total_emails} />
         <Stat label="Unread" value={`${unreadRate}%`} valueClass={unreadRate >= 50 ? "text-red-500" : "text-gray-950"} />
         {shareOfInbox !== null && <Stat label="Of your inbox" value={`${shareOfInbox}%`} />}

@@ -36,6 +36,13 @@ async function atLeast(ms, promise) {
   return result;
 }
 
+const PAGE_HEADERS = {
+  "/cleanup": { title: "Clean up", subtitle: "Suggested cleanups you can act on now, or filter to find your own" },
+  "/activity": { title: "Activity", subtitle: "A record of what you've cleaned up" },
+  "/inbox-stats": { title: "Inbox Stats", subtitle: "How your inbox is trending, and where the clutter is coming from" },
+  "/top-senders": { title: "Top Senders", subtitle: "Ranked by how much noise they add to your inbox" },
+};
+
 function App() {
   const [phase, setPhase] = useState("checking");
   const [emails, setEmails] = useState([]);
@@ -229,15 +236,14 @@ async function handleRangeSelected(days) {
     <div className="flex h-screen overflow-hidden">
       <Sidebar userEmail={userEmail} userName={userName} onSignOut={handleSignOut} />
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        {isDashboard && (
-          <Header
-            userEmail={userEmail}
-            userName={userName}
-            lastSynced={syncProgress.last_synced}
-            syncing={manualSyncing || (syncProgress.running && syncProgress.type === "full")}
-            onSyncNow={handleSyncNow}
-          />
-        )}
+        <Header
+          userEmail={userEmail}
+          userName={userName}
+          lastSynced={syncProgress.last_synced}
+          syncing={manualSyncing || (syncProgress.running && syncProgress.type === "full")}
+          onSyncNow={handleSyncNow}
+          title={PAGE_HEADERS[location.pathname]?.title}
+        />  
         <SyncProgress progress={syncProgress}/>
         <Routes>
           <Route path="/" element={<Dashboard emails={emails} refetchEmails={refetchEmails} userEmail={userEmail} syncMostlyDone={syncMostlyDone} />} />

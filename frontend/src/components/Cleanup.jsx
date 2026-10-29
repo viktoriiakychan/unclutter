@@ -1,28 +1,35 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API } from "../utils/constants";
 
-import Sidebar from "./Sidebar";
-import Header from "./Header";
 import CenterMessage from "./CenterMessage";
 import LoadingOverlay from "./LoadingOverlay";
 import SuggestionCard from "./SuggestionCard";
 import FilterPanel from "./FilterPanel";
-import { timeAgo } from "../utils/helpers";
 import BulkActionsPreview from "./BulkActionsPreview";
+import EmailRow from "./EmailRow";
+import SelectionBar from "./SelectionBar";
+import ConfirmDialog from "./ConfirmDialog";
+
+function SectionLabel({ children, right }) {
+    return (
+        <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold tracking-widest uppercase text-gray-400">{children}</p>
+            {right && <p className="text-xs text-gray-400">{right}</p>}
+        </div>
+    );
+}
 
 export default function Cleanup({ emails, refetchEmails }) {
     const [userEmail, setUserEmail] = useState("");
-    const [suggestions, setSuggestions] = useState([]);
+    const [suggestions, setSuggestions] = useState(null);
     const [pendingDelete, setPendingDelete] = useState(null); // suggestion-card delete target
     const [isDeleting, setIsDeleting] = useState(false); // suggestion-card delete only
     const [filteredEmails, setFilteredEmails] = useState([]);
+    const [filterSummary, setFilterSummary] = useState("emails");
     const [selectedIds, setSelectedIds] = useState([]);
 
     const [isDeletingMain, setIsDeletingMain] = useState(false); // bulk checkbox delete
-    const [deletingIds, setDeletingIds] = useState([]);
-
     const [isArchiving, setIsArchiving] = useState(false);
-    const [archivingIds, setArchivingIds] = useState([]);
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
@@ -33,16 +40,24 @@ export default function Cleanup({ emails, refetchEmails }) {
             .then((data) => setUserEmail(data.email));
     }, []);
 
+    // refresh suggestions whenever the inbox changes (e.g. after a delete or a sync)
     useEffect(() => {
         fetch(`${API}/suggestions`)
             .then((r) => r.json())
             .then((data) => setSuggestions(data));
+    }, [emails.length]);
+
+    // useCallback keeps this the same function between renders, so FilterPanel's effect doesn't re-run for nothing
+    const handleFilteredChange = useCallback((list, summary) => {
+        setFilteredEmails(list);
+        setFilterSummary(summary);
     }, []);
 
-     if (!userEmail || !suggestions) {
+    if (!userEmail || !suggestions) {
         return <CenterMessage text="Loading your clean up..." />;
-      }
+    }
 
+    // ---- suggestion cards ----
     async function confirmDelete(ids) {
         setPendingDelete(null);
         setIsDeleting(true);
@@ -59,11 +74,7 @@ export default function Cleanup({ emails, refetchEmails }) {
                 return;
             }
 
-            const freshRes = await fetch(`${API}/suggestions`);
-            const fresh = await freshRes.json();
-            setSuggestions(fresh);
-
-            await refetchEmails();
+            await refetchEmails(); // the suggestions effect re-runs because emails.length changes
         } catch (err) {
             console.error("Delete failed:", err);
         } finally {
@@ -73,22 +84,18 @@ export default function Cleanup({ emails, refetchEmails }) {
 
     // ---- bulk checkbox selection ----
     function toggleSelect(id) {
-        setSelectedIds((prev) =>
-            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-        );
+        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
     }
 
     const allSelected = filteredEmails.length > 0 && filteredEmails.every((e) => selectedIds.includes(e.id));
+    const selectedUnread = selectedIds.filter((id) => emails.find((e) => e.id === id)?.unread).length;
+    const busy = isArchiving || isDeletingMain;
 
     function toggleSelectAll() {
-        if (allSelected) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(filteredEmails.map((e) => e.id));
-        }
+        setSelectedIds(allSelected ? [] : filteredEmails.map((e) => e.id));
     }
 
-    async function waitUntilGone(ids, onDone, { intervalMs = 30000, maxAttempts = 10 } = {}) {
+    async function waitUntilGone(ids, onDone, { intervalMs = 1500, maxAttempts = 15 } = {}) {
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             const latest = await refetchEmails();
             const stillPresent = latest?.some((e) => ids.includes(e.id));
@@ -99,75 +106,39 @@ export default function Cleanup({ emails, refetchEmails }) {
             }
             await new Promise((r) => setTimeout(r, intervalMs));
         }
-
-        onDone(); // safety cap — same cleanup, ran too many times
+        onDone(); // safety cap
     }
 
-    async function handleDelete() {
+    // shared by delete and archive: same steps, different endpoint
+    async function runBulk(endpoint, setBusy, failMessage) {
         if (selectedIds.length === 0) return;
 
-        const idsToDelete = selectedIds;
-        setDeletingIds(idsToDelete);
-        setIsDeletingMain(true);
+        const ids = selectedIds;
+        setBusy(true);
         setSelectedIds([]);
 
         try {
-            const res = await fetch(`${API}/trash`, {
+            const res = await fetch(`${API}${endpoint}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids: idsToDelete }),
+                body: JSON.stringify({ ids }),
             });
 
             if (!res.ok) {
-                alert("Failed to delete selected emails.");
-                setIsDeletingMain(false);
-                setDeletingIds([]);
+                alert(failMessage);
+                setBusy(false);
                 return;
             }
 
-            await waitUntilGone(idsToDelete, () => {
-                setIsDeletingMain(false);
-                setDeletingIds([]);
-            });
+            await waitUntilGone(ids, () => setBusy(false));
         } catch (err) {
-            console.error("Delete failed:", err);
-            setIsDeletingMain(false);
-            setDeletingIds([]);
+            console.error(`${endpoint} failed:`, err);
+            setBusy(false);
         }
     }
 
-    async function handleArchive() {
-        if (selectedIds.length === 0) return;
-
-        const idsArchive = selectedIds;
-        setArchivingIds(idsArchive);
-        setIsArchiving(true);
-        setSelectedIds([]);
-
-        try {
-            const res = await fetch(`${API}/archive`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids: idsArchive }),
-            });
-
-            if (!res.ok) {
-                alert("Failed to archive selected emails.");
-                setIsArchiving(false);
-                setArchivingIds([]);
-                return;
-            }
-
-            await waitUntilGone(idsArchive, () => {
-                setIsArchiving(false);
-                setArchivingIds([]);
-            });
-        } catch (err) {
-            console.error("Archive failed:", err);
-            setIsArchiving(false);
-            setArchivingIds([]);
-        }
-    }
+    const handleDelete = () => runBulk("/trash", setIsDeletingMain, "Failed to delete selected emails.");
+    const handleArchive = () => runBulk("/archive", setIsArchiving, "Failed to archive selected emails.");
 
     return (
         <>
@@ -180,212 +151,113 @@ export default function Cleanup({ emails, refetchEmails }) {
                 />
             )}
 
-            {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-xl p-6 w-100">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Are you sure?</h3>
-                        <p className="text-sm text-gray-500 mb-6">
-                            You're deleting {selectedIds.length} emails, including{" "}
-                            <span className="font-semibold text-gray-900">
-                                {selectedIds.filter((id) => emails.find((e) => e.id === id)?.unread).length} unread
-                            </span>{" "}
-                            emails
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-100"
-                                onClick={() => setShowDeleteConfirm(false)}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
-                                onClick={() => {
-                                    setShowDeleteConfirm(false);
-                                    handleDelete();
-                                }}
-                            >
-                                Confirm
-                            </button>
-                        </div>
+            <ConfirmDialog
+                open={showDeleteConfirm}
+                action="delete"
+                count={selectedIds.length}
+                unreadCount={selectedUnread}
+                onCancel={() => setShowDeleteConfirm(false)}
+                onConfirm={() => {
+                    setShowDeleteConfirm(false);
+                    handleDelete();
+                }}
+            />
+            <ConfirmDialog
+                open={showArchiveConfirm}
+                action="archive"
+                count={selectedIds.length}
+                unreadCount={selectedUnread}
+                onCancel={() => setShowArchiveConfirm(false)}
+                onConfirm={() => {
+                    setShowArchiveConfirm(false);
+                    handleArchive();
+                }}
+            />
+
+            {isDeleting && <LoadingOverlay action="delete" fullScreen />}
+
+            <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-canvas px-8 pt-4 pb-6">
+                {/* suggestions */}
+                <SectionLabel right="Based on your inbox activity">Suggested for you</SectionLabel>
+
+                {suggestions.length > 0 ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        {suggestions.map((s) => (
+                            <SuggestionCard key={s.title} suggestion={s} onDeleteClick={() => setPendingDelete(s)} />
+                        ))}
                     </div>
-                </div>
-            )}
-
-            {showArchiveConfirm && (
-                <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-xl p-6 w-100">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Are you sure?</h3>
-                        <p className="text-sm text-gray-500 mb-6">
-                            You're archiving {selectedIds.length} emails, including{" "}
-                            <span className="font-semibold text-gray-900">
-                                {selectedIds.filter((id) => emails.find((e) => e.id === id)?.unread).length} unread
-                            </span>{" "}
-                            emails
-                        </p>
-                        <div className="flex justify-end gap-3">
-                            <button
-                                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-100"
-                                onClick={() => setShowArchiveConfirm(false)}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
-                                onClick={() => {
-                                    setShowArchiveConfirm(false);
-                                    handleArchive();
-                                }}
-                            >
-                                Confirm
-                            </button>
-                        </div>
+                ) : (
+                    <div className="bg-white rounded-2xl px-5 py-8 text-center">
+                        <p className="text-sm font-medium text-gray-700">Nothing to suggest right now</p>
+                        <p className="text-xs text-gray-400 mt-1">Your inbox is looking tidy.</p>
                     </div>
-                </div>
-            )}
+                )}
 
-            <div className="flex h-screen overflow-hidden bg-gray-50">
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="px-8 pb-16 py-3 flex-1 overflow-y-auto">
-                        {isDeleting && <LoadingOverlay action="delete" fullScreen />}
-                        {/* {isDeletingMain && <LoadingOverlay action="delete" />}
-                        {isArchiving && <LoadingOverlay action="archive" />} */}
+                {/* filter your own: filters card on the left, results card on the right */}
+                <div className="mt-8">
+                    <SectionLabel>Or filter your own</SectionLabel>
 
-                        {/* page title */}
-                        <div className="mb-6">
-                            <h1 className="text-2xl font-bold text-gray-900">Clean up</h1>
-                            <p className="text-sm text-gray-500 mt-1">
-                                Suggested cleanups you can act on now, or filter to find your own
-                            </p>
+                    <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4 items-stretch">
+                        <div className="bg-white rounded-2xl p-5">
+                            <FilterPanel emails={emails} onFilteredChange={handleFilteredChange} />
                         </div>
 
-                        {/* suggestion cards*/}
-                        <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="font-semibold text-gray-900">Suggested for you</h2>
-                                <span className="text-sm text-gray-400">Based on your inbox activity</span>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-4 min-w-0">
-                                {suggestions.length > 0 ? (
-                                    suggestions.map((s) => (
-                                        <SuggestionCard key={s.title} suggestion={s} onDeleteClick={() => setPendingDelete(s)} />
-                                    ))
-                                ) : (
-                                    <p className="text-gray-400 text-sm">No suggestions right now.</p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 mb-4 mt-8">
-                            <div className="flex-1 h-px bg-gray-200"></div>
-                            <span className="text-xs font-semibold text-gray-400 tracking-wider uppercase">Or filter your own</span>
-                            <div className="flex-1 h-px bg-gray-200"></div>
-                        </div>
-
-                        <FilterPanel emails={emails} onFilteredChange={setFilteredEmails} />
-
-                        {/* email list card — header + rows wrapped together */}
-                        <div className="mt-6 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
-                            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-                                <h2 className="font-semibold text-gray-900">Matching Emails</h2>
-                                <span className="text-sm text-gray-500">{filteredEmails.length} shown</span>
-                            </div>
-
-                            <div className="relative">
-                                {isDeletingMain && <LoadingOverlay action="delete" />}
-                                {isArchiving && <LoadingOverlay action="archive" />}        
-                                <div className="max-h-80 overflow-y-auto">
-                                    {filteredEmails.map((email) => (
-                                        <div
-                                            key={email.id}
-                                            className="flex items-center gap-4 px-5 py-3 border-b border-gray-100 hover:bg-gray-50"
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.includes(email.id)}
-                                                onChange={() => toggleSelect(email.id)}
-                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400 flex-shrink-0 cursor-pointer"
-                                            />
-
-                                            <span
-                                                className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                                    email.unread ? "bg-blue-500" : "bg-transparent"
-                                                }`}
-                                            ></span>
-
-                                            <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
-                                                {email.sender_name ? email.sender_name[0].toUpperCase() : "?"}
-                                            </div>
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-xs text-gray-400 truncate">{email.sender_name}</div>
-                                                <div className={`text-sm truncate ${email.unread ? "font-medium text-gray-900" : "font-normal text-gray-600"}`}>
-                                                    {email.subject}
-                                                </div>
-                                            </div>
-
-                                            {email.is_newsletter ? (
-                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium flex-shrink-0">
-                                                    newsletter
-                                                </span>
-                                            ) : (
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
-                                                    email.category === "promotions" ? "bg-yellow-100 text-yellow-700" :
-                                                    email.category === "social"     ? "bg-purple-100 text-purple-700" :
-                                                    email.category === "updates"    ? "bg-green-100 text-green-700" :
-                                                    "bg-gray-100 text-gray-700"
-                                                }`}>
-                                                    {email.category}
-                                                </span>
-                                            )}
-
-                                            <span className="text-[10px] py-0.5 text-gray-400 flex-shrink-0">
-                                                {timeAgo(email.internal_date)}
-                                            </span>
-                                        </div>
-                                    ))}
+                        <section className="relative overflow-clip min-w-0">
+                            <div className="bg-white rounded-2xl flex flex-col overflow-hidden h-[calc(100vh-12rem)] min-h-[420px]">
+                                <div className="px-5 pt-5 pb-4">
+                                    <h2 className="text-lg font-bold tracking-tight text-gray-950">Matching emails</h2>
+                                    <p className="text-xs text-gray-400 mt-0.5">
+                                        Showing <span className="font-semibold text-gray-700 tabular-nums">{filteredEmails.length}</span> {filterSummary}
+                                    </p>
                                 </div>
-                            </div>
 
-                            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
-                                <div className="flex items-center gap-3">
-                                    <label className="flex items-center gap-2 cursor-pointer">
+                                <div className="flex items-center px-5 py-2.5 border-y border-gray-100 bg-white">
+                                    <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-gray-500">
                                         <input
                                             type="checkbox"
                                             checked={allSelected}
                                             onChange={toggleSelectAll}
+                                            disabled={filteredEmails.length === 0}
                                             className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400 cursor-pointer"
                                         />
-                                        <span className="text-sm text-gray-600">Select all</span>
+                                        {selectedIds.length > 0 ? `${selectedIds.length} selected` : "Select all"}
                                     </label>
-                                    {selectedIds.length > 0 && (
-                                        <span className="text-sm text-gray-500">{selectedIds.length} selected</span>
-                                    )}
                                 </div>
 
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        disabled={selectedIds.length === 0 || isArchiving || isDeletingMain}
-                                        onClick={() => setShowArchiveConfirm(true)}
-                                        className="px-10 py-1 rounded-lg border border-gray-600/40 bg-gray-600/10 text-gray-600 text-sm font-medium hover:bg-gray-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-600/10"
-                                    >
-                                        {isArchiving ? "Archiving..." : "Archive"}
-                                    </button>
+                                <div className="relative flex-1 min-h-0">
+                                    {isDeletingMain && <LoadingOverlay action="delete" />}
+                                    {isArchiving && <LoadingOverlay action="archive" />}
 
-                                    <button
-                                        onClick={() => setShowDeleteConfirm(true)}
-                                        disabled={selectedIds.length === 0 || isArchiving || isDeletingMain}
-                                        className="px-10 py-1 rounded-lg border border-red-600/40 bg-red-600/10 text-red-600 text-sm font-medium hover:bg-red-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600/10"
-                                    >
-                                        {isDeletingMain ? "Deleting..." : "Delete"}
-                                    </button>
+                                    <div className={`h-full overflow-y-auto divide-y divide-gray-50 ${selectedIds.length > 0 ? "pb-16" : ""}`}>
+                                        {filteredEmails.length === 0 ? (
+                                            <p className="py-16 text-center text-sm text-gray-400">No emails match these filters.</p>
+                                        ) : (
+                                            filteredEmails.map((email) => (
+                                                <EmailRow
+                                                    key={email.id}
+                                                    email={email}
+                                                    isSelected={selectedIds.includes(email.id)}
+                                                    onToggle={() => toggleSelect(email.id)}
+                                                />
+                                            ))
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </main>
+
+                            {selectedIds.length > 0 && (
+                                <SelectionBar
+                                    count={selectedIds.length}
+                                    onArchive={() => setShowArchiveConfirm(true)}
+                                    onDelete={() => setShowDeleteConfirm(true)}
+                                    onClear={() => setSelectedIds([])}
+                                    disabled={busy}
+                                />
+                            )}
+                        </section>
+                    </div>
                 </div>
-            </div>
+            </main>
         </>
     );
 }

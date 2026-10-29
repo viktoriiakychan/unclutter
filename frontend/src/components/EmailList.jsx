@@ -14,7 +14,7 @@ export default function EmailList({
     const allSelected = emails.length > 0 && emails.every((e) => selectedIds.includes(e.id));
 
     return (
-        <div className="min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="mt-6 min-w-0 bg-white rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
                 <h2 className="font-semibold text-gray-900">{title}</h2>
                 <span className="text-sm text-gray-500">{emails.length} shown</span>
@@ -72,7 +72,7 @@ export default function EmailList({
                 ))}
             </div>
 
-            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
+            <div className="flex items-center justify-between bg-white px-5 py-3 border-t border-gray-200">
                 <div className="flex items-center gap-3">
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input
