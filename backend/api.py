@@ -259,7 +259,7 @@ def unsubscribe():
                 method="POST",
             )
             urllib.request.urlopen(req, timeout=10)
-            dismiss_sender_in_db(sender_email)
+            database.dismiss_sender_in_db(sender_email)
             return jsonify({"method": "one_click"})
         except Exception as e:
             print("One-click failed, falling back to link:", e)

@@ -460,11 +460,6 @@ class GmailClient:
         gone = []
         failed = []
 
-    def get_current_labels(self, ids):
-        labels = {}   # {id: [labelIds]}
-        gone = []     # permanently deleted, Gmail returns 404
-        failed = []   # anything else (rate limits etc.)
-
         def handle(request_id, response, exception):
             if exception is not None:
                 if isinstance(exception, HttpError) and exception.resp.status == 404:
