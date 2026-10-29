@@ -10,6 +10,7 @@ import UnsubscribeCard from "./UnsubscribeCard";
 import WorstOffenderCard from "./WorstOffenderCard";
 import { EMAIL_FILTERS } from "../utils/categories";
 import ConfirmDialog from "./ConfirmDialog";
+import { useToast } from "./Toast";
 
 import { API } from "../utils/constants";
 
@@ -44,6 +45,7 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
     const [activityLog, setActivityLog] = useState([]);
 
     const listRef = useRef(null);
+    const showToast = useToast();
 
     const [healthScore, setHealthScore] = useState(() => {
     const cached = localStorage.getItem("healthScore");
@@ -139,6 +141,17 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
         setSelectedIds((prev) =>
             prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
         );
+    }   
+
+    const plural = (n) => `${n} ${n === 1 ? "email" : "emails"}`;
+
+    async function undo(endpoint, ids) {
+        await fetch(`${API}${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids }),
+        });
+        await refetchEmails();
     }
 
     async function handleDelete() {
@@ -166,6 +179,10 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
             await waitUntilGone(idsToDelete, () => {
                 setIsDeleting(false);
                 setDeletingIds([]);
+            });
+            showToast({
+                message: `Moved ${plural(idsToDelete.length)} to Trash`,
+                onUndo: () => undo("/untrash", idsToDelete),
             });
         } 
         catch (err) {
@@ -223,6 +240,10 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
             await waitUntilGone(idsArchive, () => {
                 setIsArchiving(false);
                 setArchivingIds([]);
+            });
+            showToast({
+                message: `Archived ${plural(idsArchive.length)}`,
+                onUndo: () => undo("/unarchive", idsArchive),
             });
         } 
         catch (err) {

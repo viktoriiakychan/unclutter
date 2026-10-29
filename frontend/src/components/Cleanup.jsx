@@ -9,6 +9,8 @@ import BulkActionsPreview from "./BulkActionsPreview";
 import EmailRow from "./EmailRow";
 import SelectionBar from "./SelectionBar";
 import ConfirmDialog from "./ConfirmDialog";
+import { useToast } from "./Toast";
+
 
 function SectionLabel({ children, right }) {
     return (
@@ -33,6 +35,20 @@ export default function Cleanup({ emails, refetchEmails }) {
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+
+    const showToast = useToast();
+
+    const plural = (n) => `${n} ${n === 1 ? "email" : "emails"}`;
+
+    // undo = call the opposite endpoint with the same ids, then reload the list
+    async function undo(endpoint, ids) {
+        await fetch(`${API}${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids }),
+        });
+        await refetchEmails();
+    }
 
     useEffect(() => {
         fetch(`${API}/auth/me`)
@@ -75,6 +91,10 @@ export default function Cleanup({ emails, refetchEmails }) {
             }
 
             await refetchEmails(); // the suggestions effect re-runs because emails.length changes
+            showToast({
+                message: `Moved ${plural(ids.length)} to Trash`,
+                onUndo: () => undo("/untrash", ids),
+            });
         } catch (err) {
             console.error("Delete failed:", err);
         } finally {
@@ -131,6 +151,11 @@ export default function Cleanup({ emails, refetchEmails }) {
             }
 
             await waitUntilGone(ids, () => setBusy(false));
+            const isDelete = endpoint === "/trash";
+            showToast({
+                message: isDelete ? `Moved ${plural(ids.length)} to Trash` : `Archived ${plural(ids.length)}`,
+                onUndo: () => undo(isDelete ? "/untrash" : "/unarchive", ids),
+            });
         } catch (err) {
             console.error(`${endpoint} failed:`, err);
             setBusy(false);
