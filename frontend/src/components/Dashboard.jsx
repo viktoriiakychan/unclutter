@@ -60,6 +60,8 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
         return cached ? JSON.parse(cached) : null;
     });
 
+    const pending = !syncMostlyDone;
+
     useEffect(()=> {
         fetch(`${API}/unsubscribe-list`)
         .then((r) => r.json())
@@ -334,19 +336,19 @@ return (
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
                 <div className="lg:col-span-3">
-                    <HealthCard score={healthScore} worstOffender={worstOffender} onCleanNow={handleCleanWorst} />
+                    <HealthCard pending={pending} score={healthScore} worstOffender={worstOffender} onCleanNow={handleCleanWorst} />
                 </div>
 
                 <div className="lg:col-span-2 grid grid-cols-2 gap-4">
-                    <MetricCard label="Total" value={emails.length} sub="in your inbox"
+                    <MetricCard pending={pending} label="Total" value={emails.length} sub="in your inbox"
                     onClick={() => showFilter("All")} active={activeFilter === "All"} />
-                    <MetricCard label="Unread" dotClass="bg-blue-600" valueClass="text-blue-600"
+                    <MetricCard pending={pending} label="Unread" dotClass="bg-blue-600" valueClass="text-blue-600"
                     value={unreadCount} sub={`${unreadPct}% of inbox`}
                     onClick={() => showFilter("Unread")} active={activeFilter === "Unread"} />
-                    <MetricCard label="Newsletters" dotClass="bg-amber-500"
+                    <MetricCard pending={pending} label="Newsletters" dotClass="bg-amber-500"
                     value={newsletterCount} sub={`${newsletterSenders} ${newsletterSenders === 1 ? "sender" : "senders"}`}
                     onClick={() => showFilter("Newsletter")} active={activeFilter === "Newsletter"} />
-                    <MetricCard label="Promotions" dotClass="bg-pink-500"
+                    <MetricCard pending={pending} label="Promotions" dotClass="bg-pink-500"
                     value={promotionsCount} sub={`${promotionSenders} ${promotionSenders === 1 ? "sender" : "senders"}`}
                     onClick={() => showFilter("Promotions")} active={activeFilter === "Promotions"} />
                 </div>
@@ -356,6 +358,7 @@ return (
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6 items-stretch">
                 <div className="lg:col-span-3">
                     <WorstOffenderCard
+                        pending={pending}
                         offender={worstOffender}
                         inboxTotal={emails.length}
                         onCleanNow={handleCleanWorst}
@@ -365,6 +368,7 @@ return (
                 </div>
                 <div className="lg:col-span-2">
                     <UnsubscribeCard
+                        syncing={pending}
                         list={unsubscribeList}
                         emails={emails}
                         onUnsubscribe={handleUnsubscribeClick}

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { CATEGORY_STYLES } from "../utils/categories";
+import { CATEGORY_STYLES } from "../utils/Categories";
+import { blurWhile } from "../utils/pending";
 
 const PREVIEW_COUNT = 3;
 
-export default function UnsubscribeCard({ list, emails, onUnsubscribe }) {
+export default function UnsubscribeCard({ list, emails, onUnsubscribe, syncing = false }) {
   const [showAll, setShowAll] = useState(false);
   const [pending, setPending] = useState(null); // sender currently being unsubscribed
 
@@ -41,7 +42,7 @@ export default function UnsubscribeCard({ list, emails, onUnsubscribe }) {
         </div>
       ) : (
         <>
-          <div className={`mt-3 -mx-2 flex-1 ${showAll ? "max-h-56 overflow-y-auto" : ""}`}>
+          <div className={`mt-3 -mx-2 flex-1 ${showAll ? "max-h-56 overflow-y-auto" : ""} ${blurWhile(syncing)}`}>
             {visible.map((item) => {
               const unread = unreadFrom(item.sender_email);
               const name = item.sender_name || item.sender_email;

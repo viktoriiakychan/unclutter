@@ -69,6 +69,8 @@ function App() {
 
   const [syncProgress, setSyncProgress] = useState({ synced: 0, total: 0, running: false, type: null });
 
+  const [firstSync, setFirstSync] = useState(false);
+
   // every 30s: start a sync and watch it until it's done (progress is only checked while a sync runs)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -79,7 +81,7 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
+  const syncMostlyDone = !(firstSync || (syncProgress.running && syncProgress.type === "full"));
 
   // cheap — just reads your own DB, safe to poll often
   async function refetchEmails() {
@@ -153,6 +155,11 @@ function App() {
     setPhase("ready");
 
     try {
+      const p = await (await fetch(`${API}/sync/progress`)).json();
+      setSyncProgress(p);
+    } catch {}
+
+    try {
       const emailRes = await fetch(`${API}/auth/me`);
       const emailData = await emailRes.json();
       if (emailData.email) {
@@ -202,7 +209,9 @@ const handleSignOut = async () => {
 };
 
 async function handleRangeSelected(days) {
+    setFirstSync(true); 
     setPhase("loading");
+
     const res = await fetch(`${API}/emails`);
     setEmails(await res.json());
     setPhase("ready");
@@ -226,10 +235,12 @@ async function handleRangeSelected(days) {
 
     if (!ready) {
       console.error("Gave up waiting for backend to be ready");
+      setFirstSync(false);        // don't leave it blurred forever
       return;
     }
 
-    syncAndWait({ days });
+    await syncAndWait({ days });  // now awaited: waits until the sync is done
+    setFirstSync(false);
 }
 
   return (

@@ -1,3 +1,5 @@
+import { blurWhile } from "../utils/pending";
+
 function Stat({ label, value, valueClass = "text-gray-950" }) {
   return (
     <div>
@@ -8,7 +10,7 @@ function Stat({ label, value, valueClass = "text-gray-950" }) {
 }
 
 // who, how bad, and the two things you can do about it
-export default function WorstOffenderCard({ offender, inboxTotal, onCleanNow, onUnsubscribe, canUnsubscribe }) {
+export default function WorstOffenderCard({ offender, inboxTotal, onCleanNow, onUnsubscribe, canUnsubscribe, pending = false }) {
   if (!offender?.sender_email) {
     return (
       <div className="h-full bg-white rounded-2xl p-5 flex flex-col">
@@ -39,13 +41,13 @@ export default function WorstOffenderCard({ offender, inboxTotal, onCleanNow, on
         <div className="w-11 h-11 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-lg font-semibold flex-shrink-0">
           {name[0].toUpperCase()}
         </div>
-        <div className="min-w-0">
+        <div className={`min-w-0 ${blurWhile(pending)}`}>
           <p className="font-semibold text-gray-950 truncate">{name}</p>
           <p className="text-xs text-gray-400 truncate">{offender.sender_email}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 bg-canvas rounded-xl px-4 py-3 mt-4">
+      <div className={`grid grid-cols-3 gap-4 bg-gray-50 rounded-xl px-4 py-3 mt-4 ${blurWhile(pending, false)}`}>
         <Stat label="Emails" value={offender.total_emails} />
         <Stat label="Unread" value={`${unreadRate}%`} valueClass={unreadRate >= 50 ? "text-red-500" : "text-gray-950"} />
         {shareOfInbox !== null && <Stat label="Of your inbox" value={`${shareOfInbox}%`} />}
@@ -54,9 +56,10 @@ export default function WorstOffenderCard({ offender, inboxTotal, onCleanNow, on
       {/* mt-auto pins the buttons to the bottom, so they line up with "See all" next door */}
       <div className="flex gap-2 mt-auto pt-5">
         <button
-          onClick={onCleanNow}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-semibold py-1.5 rounded-lg transition"
-        >
+            onClick={onCleanNow}
+            disabled={pending}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-semibold py-2.5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
           Clean now
         </button>
         {canUnsubscribe && (

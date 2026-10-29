@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { blurWhile } from "../utils/pending";
 
 // one look per health band: ring, pill, background tint, headline
 const BANDS = [
@@ -38,7 +39,7 @@ function getBand(score) {
   return BANDS.find((b) => score >= b.min) || BANDS[BANDS.length - 1];
 }
 
-function HealthRing({ score, color, track }) {
+function HealthRing({ score, color, track, pending}) {
   const size = 160;
   const stroke = 14;
   const radius = (size - stroke) / 2;
@@ -65,7 +66,7 @@ function HealthRing({ score, color, track }) {
 
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-[10px] font-semibold tracking-widest uppercase text-gray-400">Health</span>
-        <span className="text-5xl font-bold tracking-tight text-gray-950 tabular-nums leading-none mt-1">
+        <span className={`text-5xl font-bold tracking-tight text-gray-950 tabular-nums leading-none mt-1 ${blurWhile(pending)}`}>
           {score}
         </span>
         <span className="text-xs text-gray-400 mt-1.5">/ 100</span>
@@ -74,7 +75,7 @@ function HealthRing({ score, color, track }) {
   );
 }
 
-export default function HealthCard({ score, worstOffender, onCleanNow }) {
+export default function HealthCard({ score, worstOffender, onCleanNow , pending=false}) {
   const rounded = Math.round(score);
   const band = getBand(rounded);
 
@@ -82,17 +83,24 @@ export default function HealthCard({ score, worstOffender, onCleanNow }) {
 
   return (
     <div className={`h-full bg-gradient-to-r ${band.tint} to-white bg-white rounded-2xl p-8 flex items-center gap-10`}>
-      <HealthRing score={rounded} color={band.ring} track={band.track} />
+      <HealthRing score={pending ? 0 : rounded} pending={pending} color={band.ring} track={band.track} />
 
       <div className="min-w-0">
-        <span className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 ${band.pillClass}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${band.dotClass}`} />
-          {band.pill}
-        </span>
+        {pending ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 bg-gray-100 text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse" />
+                Calculating...
+            </span>
+            ) : (
+            <span className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 ${band.pillClass}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${band.dotClass}`} />
+                    {band.pill}
+                    </span>
+            )}
+                
+        <h2 className={`text-2xl font-bold tracking-tight text-gray-950 mt-3 ${blurWhile(pending)}`}>{band.headline}</h2>
 
-        <h2 className="text-2xl font-bold tracking-tight text-gray-950 mt-3">{band.headline}</h2>
-
-        <p className="text-sm text-gray-500 mt-2 leading-relaxed max-w-sm">
+        <p className={`text-sm text-gray-500 mt-2 leading-relaxed max-w-sm ${blurWhile(pending)}`}>
           {showSuggestion ? (
             <>
               <span className="font-semibold text-gray-900">{worstOffender.sender_name || worstOffender.sender_email}</span>{" "}
