@@ -53,12 +53,12 @@ function UserCard({ userEmail, onSignOut }) {
   const domain = at > -1 ? userEmail.slice(at) : "";
 
   return (
-    <div className="flex items-center gap-2.5 bg-white border border-gray-100 rounded-xl p-2.5">
+    <div className="w-full flex items-center gap-3 bg-slate-50 border border-gray-100 rounded-xl px-3.5 py-3">
       <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold flex items-center justify-center flex-shrink-0">
         {name[0]?.toUpperCase()}
       </div>
 
-      <div className="min-w-0 flex-1">
+     <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
         <p className="text-xs text-gray-400 truncate">{domain}</p>
       </div>
@@ -77,7 +77,7 @@ function UserCard({ userEmail, onSignOut }) {
 
 export default function Sidebar({ userEmail, onSignOut }) {
   return (
-    <aside className="w-60 flex-shrink-0 bg-slate-50 flex flex-col">
+    <aside className="w-60 flex-shrink-0 bg-white flex flex-col">
       <div className="px-5 py-6">
         <Logo size="sm" />
       </div>
@@ -97,7 +97,7 @@ export default function Sidebar({ userEmail, onSignOut }) {
         ))}
       </nav>
 
-      <div className="p-3">
+      <div className="px-3 pb-4">
         <UserCard userEmail={userEmail} onSignOut={onSignOut} />
       </div>
     </aside>

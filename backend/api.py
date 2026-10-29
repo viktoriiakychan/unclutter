@@ -443,6 +443,7 @@ def background_sync(sync_days=None):
                 )
                 conn.commit()
                 conn.close()
+                database.set_last_synced()
 
                 sync_progress["total"] = (
                     len(changes["added"]) + len(changes["deleted"])
@@ -495,6 +496,7 @@ def background_sync(sync_days=None):
                 )
                 conn.commit()
                 conn.close()
+                database.set_last_synced()
             except Exception as e:
                 print("Failed to save history checkpoint:", e)
 
@@ -541,7 +543,7 @@ def start_sync():
 
 @app.route("/sync/progress")
 def get_sync_progress():
-    return jsonify(sync_progress)
+    return jsonify({**sync_progress, "last_synced": database.get_last_synced()})
 
 @app.route("/auth/logout", methods=["POST"])
 def auth_logout():

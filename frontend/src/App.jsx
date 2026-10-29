@@ -78,7 +78,14 @@ function App() {
     return data;
   }
 
-  const isSyncing = useRef(false);
+  const [manualSyncing, setManualSyncing] = useState(false);
+
+  async function handleSyncNow() {
+    setManualSyncing(true);
+    await syncAndWait();
+    setManualSyncing(false);
+  }
+    const isSyncing = useRef(false);
 
   async function syncAndWait(body = {}) {
     if (isSyncing.current) return;   // don't start a second one on top
@@ -215,7 +222,13 @@ async function handleRangeSelected(days) {
     <div className="flex h-screen overflow-hidden">
       <Sidebar userEmail={userEmail} onSignOut={handleSignOut} />
       <div className="flex-1 min-w-0 overflow-hidden">
-        <Header userEmail={userEmail} onSignIn={handleSignIn} onSignOut={handleSignOut} />
+        <Header
+            userEmail={userEmail}
+            onSignOut={handleSignOut}
+            lastSynced={syncProgress.last_synced}
+            syncing={manualSyncing || (syncProgress.running && syncProgress.type === "full")}
+            onSyncNow={handleSyncNow}
+          />
         <SyncProgress progress={syncProgress}/>
         <Routes>
           <Route path="/" element={<Dashboard emails={emails} refetchEmails={refetchEmails} userEmail={userEmail} syncMostlyDone={syncMostlyDone} />} />

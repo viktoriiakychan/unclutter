@@ -1,5 +1,6 @@
 import sqlite3
 from models import Email
+import time
 
 DB_FILE = "emails.db"
 
@@ -352,3 +353,19 @@ def dismiss_sender_in_db(sender_email):
 
     conn.commit()
     conn.close()
+
+def set_last_synced():
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO sync_state (key, value) VALUES ('last_synced', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (str(int(time.time() * 1000)),),   # milliseconds, what JavaScript's Date uses
+    )
+    conn.commit()
+    conn.close()
+
+def get_last_synced():
+    conn = get_connection()
+    row = conn.execute("SELECT value FROM sync_state WHERE key = 'last_synced'").fetchone()
+    conn.close()
+    return int(row[0]) if row else None
