@@ -29,7 +29,7 @@ export default function WorstOffenderCard({ offender, inboxTotal, onCleanNow, on
   const shareOfInbox = inboxTotal ? Math.min(100, Math.round((offender.total_emails / inboxTotal) * 100)) : null;
 
   return (
-    <div className="h-full bg-white rounded-2xl p-5 flex flex-col">
+    <div className="bg-white rounded-2xl p-5 flex flex-col">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold tracking-widest uppercase text-gray-400">Worst offender</p>
         <span className="text-[11px] font-semibold uppercase tracking-wide bg-red-50 text-red-600 rounded-full px-2 py-0.5">
@@ -54,7 +54,7 @@ export default function WorstOffenderCard({ offender, inboxTotal, onCleanNow, on
       </div>
 
       {/* mt-auto pins the buttons to the bottom, so they line up with "See all" next door */}
-      <div className="flex gap-2 mt-auto pt-5">
+      <div className="flex gap-2 pt-5">
         <button
             onClick={onCleanNow}
             disabled={pending}

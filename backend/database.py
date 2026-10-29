@@ -3,6 +3,7 @@ from models import Email
 import time
 
 DB_FILE = "emails.db"
+ME = "(SELECT value FROM sync_state WHERE key = 'account_email')"
 
 def get_connection():
     conn = sqlite3.connect(DB_FILE, timeout=30)
@@ -75,6 +76,11 @@ def create_activity_table():
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    try:
+        cursor.execute("ALTER TABLE activity_log ADD COLUMN account_email TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
     conn.commit()
     conn.close()
@@ -205,10 +211,10 @@ def delete_emails(ids):
         conn.execute(f"""
             INSERT INTO activity_log (email_id, thread_id, sender_name, sender_email, subject, date,
                 unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
-                internal_date, action_type)
+                internal_date, action_type, account_email)
             SELECT id, thread_id, sender_name, sender_email, subject, date,
                 unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
-                internal_date, 'deleted'
+                internal_date, 'deleted', {ME}
             FROM emails WHERE id IN ({ph})
         """, chunk)
         conn.execute(f"DELETE FROM emails WHERE id IN ({ph})", chunk)
@@ -224,10 +230,10 @@ def mark_archived(ids):
         conn.execute(f"""
             INSERT INTO activity_log (email_id, thread_id, sender_name, sender_email, subject, date,
                 unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
-                internal_date, action_type)
+                internal_date, action_type, account_email)
             SELECT id, thread_id, sender_name, sender_email, subject, date,
                 unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
-                internal_date, 'archived'
+                internal_date, 'archived', {ME}
             FROM emails WHERE id IN ({ph}) AND is_archived = 0
         """, chunk)
         conn.execute(f"UPDATE emails SET is_archived = 1 WHERE id IN ({ph})", chunk)
@@ -258,7 +264,8 @@ def set_unread(ids, unread):
 def get_activity_log(limit=100):
     conn = get_connection()
     rows = conn.execute(
-        "SELECT * FROM activity_log ORDER BY timestamp DESC LIMIT ?", (limit,)
+        f"SELECT * FROM activity_log WHERE account_email = {ME} ORDER BY timestamp DESC LIMIT ?",
+        (limit,)
     ).fetchall()
     conn.close()
 
@@ -289,7 +296,7 @@ def remove_from_activity_log(ids):
     for i in range(0, len(ids), 900):
         chunk = ids[i:i + 900]
         ph = ",".join("?" for _ in chunk)
-        conn.execute(f"DELETE FROM activity_log WHERE email_id IN ({ph})", chunk)
+        conn.execute(f"DELETE FROM activity_log WHERE email_id IN ({ph}) AND account_email = {ME}", chunk)
     conn.commit()
     conn.close()
 
@@ -300,7 +307,7 @@ def restore_from_activity_log(ids):
     for email_id in ids:
         # get the most recent log entry for this email
         row = conn.execute(
-            "SELECT * FROM activity_log WHERE email_id = ? ORDER BY timestamp DESC LIMIT 1",
+            f"SELECT * FROM activity_log WHERE email_id = ? AND account_email = {ME} ORDER BY timestamp DESC LIMIT 1",
             (email_id,)
         ).fetchone()
 
@@ -327,8 +334,41 @@ def clear_all_local_data():
     cursor.execute("DELETE FROM emails")
     cursor.execute("DELETE FROM attachments")
     cursor.execute("DELETE FROM sync_state")
-    cursor.execute("DELETE FROM activity_log")
 
+    conn.commit()
+    conn.close()
+
+def claim_account(email):
+    
+    conn = get_connection()
+    row = conn.execute("SELECT value FROM sync_state WHERE key = 'account_email'").fetchone()
+
+    if row and row[0] != email:
+        conn.execute("DELETE FROM activity_log")
+        conn.execute("DELETE FROM dismissed_senders")
+
+    conn.execute(
+        "INSERT INTO sync_state (key, value) VALUES ('account_email', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (email,)
+    )
+    conn.commit()
+    conn.close()
+
+def set_account(email):
+    conn = get_connection()
+    old = conn.execute("SELECT value FROM sync_state WHERE key = 'account_email'").fetchone()
+
+    if old and old[0] != email:
+        conn.execute("DELETE FROM dismissed_senders")  # see note below
+
+    conn.execute(
+        "INSERT INTO sync_state (key, value) VALUES ('account_email', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (email,)
+    )
+    # rows from before this column existed have no owner, give them to whoever logs in first
+    conn.execute("UPDATE activity_log SET account_email = ? WHERE account_email IS NULL", (email,))
     conn.commit()
     conn.close()
 

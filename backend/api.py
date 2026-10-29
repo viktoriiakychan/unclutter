@@ -509,8 +509,18 @@ def start_sync():
         return jsonify({"error": "already running"}), 409
 
     body = request.get_json(silent=True) or {}
+
+    if "days" in body:
+        try:
+            client = GmailClient()
+            client.connect()
+            database.set_account(client.get_profile()["email"])
+        except Exception as e:
+            print("set_account failed:", e)
+
     conn = database.get_connection()
     cursor = conn.cursor()
+    
 
     if "days" in body:
         raw_days = body.get("days")
