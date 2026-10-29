@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-import { Routes, Route, useNavigate } from 'react-router-dom'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import Cleanup from './components/Cleanup'
 import SyncRangePicker from "./components/SyncRangePicker";
 
@@ -41,10 +41,14 @@ function App() {
   const [emails, setEmails] = useState([]);
 
   const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState(null);
 
   const isRefreshing = useRef(false);
 
   const navigate = useNavigate();
+
+  const location = useLocation();
+  const isDashboard = location.pathname === "/";
 
   useEffect(() => {
     checkLogin();
@@ -119,7 +123,7 @@ function App() {
 
   async function checkLogin() {
     setPhase("checking");
-    const res = await atLeast(4000, fetch(`${API}/auth/status`));
+    const res = await atLeast(2000, fetch(`${API}/auth/status`));
     const { logged_in } = await res.json();
 
     if (logged_in) {
@@ -145,7 +149,9 @@ function App() {
       const emailRes = await fetch(`${API}/auth/me`);
       const emailData = await emailRes.json();
       if (emailData.email) {
-        setUserEmail(emailData.email);
+         setUserEmail(emailData.email);
+          setUserName(emailData.name || null);
+          ready = true;
       }
     } catch (err) {
       console.error("Failed to fetch user email:", err);
@@ -175,6 +181,7 @@ const handleSignOut = async () => {
     try {
       await fetch(`${API}/auth/logout`, { method: "POST" });
       setUserEmail(null);
+      setUserName(null);
       setEmails([]);
       setPhase("loggedOut");
       navigate("/");
@@ -220,15 +227,17 @@ async function handleRangeSelected(days) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar userEmail={userEmail} onSignOut={handleSignOut} />
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <Header
+      <Sidebar userEmail={userEmail} userName={userName} onSignOut={handleSignOut} />
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {isDashboard && (
+          <Header
             userEmail={userEmail}
-            onSignOut={handleSignOut}
+            userName={userName}
             lastSynced={syncProgress.last_synced}
             syncing={manualSyncing || (syncProgress.running && syncProgress.type === "full")}
             onSyncNow={handleSyncNow}
           />
+        )}
         <SyncProgress progress={syncProgress}/>
         <Routes>
           <Route path="/" element={<Dashboard emails={emails} refetchEmails={refetchEmails} userEmail={userEmail} syncMostlyDone={syncMostlyDone} />} />

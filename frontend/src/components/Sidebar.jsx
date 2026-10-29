@@ -44,10 +44,11 @@ function NavItem({ to, label, icon: Icon, end }) {
   );
 }
 
-function UserCard({ userEmail, onSignOut }) {
+function UserCard({ userEmail, userName, onSignOut }) {
   if (!userEmail) return null;
 
-  // "vvkychan@gmail.com" -> "vvkychan" + "@gmail.com"
+  const initial = (userName || userEmail)[0].toUpperCase();
+
   const at = userEmail.indexOf("@");
   const name = at > -1 ? userEmail.slice(0, at) : userEmail;
   const domain = at > -1 ? userEmail.slice(at) : "";
@@ -55,12 +56,12 @@ function UserCard({ userEmail, onSignOut }) {
   return (
     <div className="w-full flex items-center gap-3 bg-slate-50 border border-gray-100 rounded-xl px-3.5 py-3">
       <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-sm font-semibold flex items-center justify-center flex-shrink-0">
-        {name[0]?.toUpperCase()}
+        {initial.toUpperCase()}
       </div>
 
      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-gray-900 truncate">{name}</p>
-        <p className="text-xs text-gray-400 truncate">{domain}</p>
+        <p className="text-sm font-semibold text-gray-900 truncate">{userName || userEmail}</p>
+        {userName && <p className="text-xs text-gray-400 truncate">{userEmail}</p>}
       </div>
 
       <button
@@ -75,7 +76,7 @@ function UserCard({ userEmail, onSignOut }) {
   );
 }
 
-export default function Sidebar({ userEmail, onSignOut }) {
+export default function Sidebar({ userEmail, userName, onSignOut }) {
   return (
     <aside className="w-60 flex-shrink-0 bg-white flex flex-col">
       <div className="px-5 py-6">
@@ -98,7 +99,7 @@ export default function Sidebar({ userEmail, onSignOut }) {
       </nav>
 
       <div className="px-3 pb-4">
-        <UserCard userEmail={userEmail} onSignOut={onSignOut} />
+        <UserCard userEmail={userEmail} userName={userName} onSignOut={onSignOut} />
       </div>
     </aside>
   );

@@ -526,3 +526,24 @@ class GmailClient:
         counts["all"] = self.get_inbox_count()    # exact, from the INBOX label
         counts["cap"] = cap                       # so the frontend knows when to show "2,000+"
         return counts
+
+    def get_display_name(self):
+        # 1. the name you send emails as (Gmail settings > Accounts > Send mail as)
+        send_as = self.service.users().settings().sendAs().list(userId="me").execute()
+        for alias in send_as.get("sendAs", []):
+            if alias.get("isPrimary") and alias.get("displayName"):
+                return alias["displayName"]
+
+        # 2. fallback: the name on most recent sent email
+        sent = self.service.users().messages().list(userId="me", q="in:sent", maxResults=1).execute()
+        for m in sent.get("messages", []):
+            msg = self.service.users().messages().get(
+                userId="me", id=m["id"], format="metadata", metadataHeaders=["From"]
+            ).execute()
+            for header in msg.get("payload", {}).get("headers", []):
+                if header["name"] == "From":
+                    name, _ = parseaddr(header["value"])   # "Viktoriia Kychan <v@gmail.com>" → "Viktoriia Kychan"
+                    if name:
+                        return name
+
+        return None

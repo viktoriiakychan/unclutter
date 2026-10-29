@@ -60,16 +60,6 @@ def sync():
 
     return jsonify({"synced": len(emails)})
 
-@app.route("/auth/me")
-def get_logged_in_user():
-    try:
-        client = GmailClient()
-        client.connect()
-        profile = client.get_profile()
-        return profile
-    except Exception as e:
-        return jsonify({"error": str(e)}), 401
-
 @app.route("/unsubscribe-list")
 def unsubscribe_list():
     try:
@@ -584,6 +574,41 @@ def range_estimates():
         if "rateLimitExceeded" in str(e):
             return jsonify({"error": "rate_limited"}), 429   # 429 = "too many requests"
         raise
+
+def get_cached_display_name(client):
+    conn = database.get_connection()
+    row = conn.execute("SELECT value FROM sync_state WHERE key = 'display_name'").fetchone()
+    if row:
+        conn.close()
+        return row[0] or None
+
+    try:
+        name = client.get_display_name()
+    except Exception as e:
+        print("Couldn't get display name:", e)
+        conn.close()
+        return None   # don't save a failure, try again next time
+
+    conn.execute(
+        "INSERT OR REPLACE INTO sync_state (key, value) VALUES ('display_name', ?)",
+        (name or "",),
+    )
+    conn.commit()
+    conn.close()
+    return name
+
+
+@app.route("/auth/me")
+def get_logged_in_user():
+    try:
+        client = GmailClient()
+        client.connect()
+        profile = client.get_profile()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
+    profile["name"] = get_cached_display_name(client)
+    return jsonify(profile)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000, threaded=True)

@@ -2,3 +2,8 @@
 
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #e8eaed transparent;   /* thumb colour, track colour */
+}

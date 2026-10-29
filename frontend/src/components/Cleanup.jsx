@@ -246,18 +246,13 @@ export default function Cleanup({ emails, refetchEmails }) {
 
             <div className="flex h-screen overflow-hidden bg-gray-50">
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="px-8 pb-16 py-6 flex-1 overflow-y-auto">
+                    <main className="px-8 pb-16 py-3 flex-1 overflow-y-auto">
                         {isDeleting && <LoadingOverlay action="delete" fullScreen />}
                         {/* {isDeletingMain && <LoadingOverlay action="delete" />}
                         {isArchiving && <LoadingOverlay action="archive" />} */}
 
                         {/* page title */}
-                        <div className="mb-6">
-                            <h1 className="text-2xl font-bold text-gray-900">Clean up</h1>
-                            <p className="text-sm text-gray-500 mt-1">
-                                Suggested cleanups you can act on now, or filter to find your own
-                            </p>
-                        </div>
+                       
 
                         {/* suggestion cards*/}
                         <div>
