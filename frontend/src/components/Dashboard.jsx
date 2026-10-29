@@ -101,7 +101,7 @@
 
     
         if (!userEmail || !activityLog || healthScore == null || flaggedCount == null) {
-                return <CenterMessage text="Loading your dashboard" />;
+                return <CenterMessage text="Loading your dashboard..." />;
         }
 
     

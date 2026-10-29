@@ -1,5 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
+
 // expects data = [{ date: "2026-06-28", count: 12 }, { date: "2026-06-29", count: 4 }, ...]
 export default function EmailVolumeChart({ data, days }) {
   return (

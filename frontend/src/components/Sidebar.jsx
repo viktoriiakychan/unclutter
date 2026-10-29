@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import broomIcon from "../assets/broom.png";
+import logoIcon from "../assets/unclutter-mark.svg";
+import Logo from "./Logo";  
 
 
 function Sidebar() {
@@ -8,7 +10,7 @@ function Sidebar() {
 
       {/* ----- LOGO -----*/}
       <div className="px-6 py-5 flex items-center ">
-        <span className="font-bold text-2xl tracking-tight">unclutter<span className="text-blue-600">.</span></span>
+        <Logo size="sm" />  
       </div>
 
       <nav className="px-3 mt-2 space-y-1">

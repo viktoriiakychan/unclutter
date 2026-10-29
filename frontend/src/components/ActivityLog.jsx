@@ -159,6 +159,7 @@ export default function Activity({ refetchEmails }) {
 
                         {filtered.length > 0 && (
                             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
+                                
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
@@ -184,7 +185,8 @@ export default function Activity({ refetchEmails }) {
                             </div>
                         )}
 
-                        <div className="max-h-[70vh] overflow-y-auto">
+                        <div                         
+                        className="max-h-[70vh] overflow-y-auto" >
                             {filtered.length === 0 ? (
                                 <p className="text-gray-400 text-sm px-5 py-6">Nothing here yet.</p>
                             ) : (
@@ -192,6 +194,7 @@ export default function Activity({ refetchEmails }) {
                                     const isSelected = selectedIds.includes(entry.id);
                                     return (
                                         <div
+                                            onClick={() => toggleSelect(entry.id)}  
                                             key={entry.id}
                                             className={`flex items-center gap-4 px-5 py-3 border-b border-gray-100 transition-colors ${
                                                 isSelected ? "bg-blue-50" : "hover:bg-gray-50"
