@@ -61,16 +61,16 @@ function App() {
 
   useEffect(() => {
     const interval = setInterval(async () => {
-        const res = await fetch(`${API}/sync/progress`);
-        const progress = await res.json();
+      const res = await fetch(`${API}/sync/progress`);
+      const progress = await res.json();
+      setSyncProgress(progress);
 
-        // refetch while running, AND once more on the check right after it stops
-        if (progress.running || wasRunning.current) {
-            refetchEmails();
-        }
-        wasRunning.current = progress.running;
+      // refetch while running, and once more right after it stops
+      if (progress.running || wasRunning.current) {
+        refetchEmails();
+      }
+      wasRunning.current = progress.running;
     }, 2000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -275,7 +275,7 @@ async function handleRangeSelected(days) {
       <Sidebar />
       <div className="flex-1 min-w-0 overflow-hidden">
         <Header userEmail={userEmail} onSignIn={handleSignIn} onSignOut={handleSignOut} />
-        <SyncProgress API={API}/>
+        <SyncProgress progress={syncProgress}/>
         <Routes>
           <Route path="/" element={<Dashboard emails={emails} refetchEmails={refetchEmails} userEmail={userEmail} syncMostlyDone={syncMostlyDone} />} />
           <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails={refetchEmails}/>} />

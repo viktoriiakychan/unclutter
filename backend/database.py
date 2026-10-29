@@ -242,6 +242,18 @@ def mark_unarchived(ids):
     conn.commit()
     conn.close()  
 
+def set_unread(ids, unread):
+    conn = get_connection()
+    for i in range(0, len(ids), 900):
+        chunk = ids[i:i + 900]
+        ph = ",".join("?" for _ in chunk)
+        conn.execute(
+            f"UPDATE emails SET unread = ? WHERE id IN ({ph})",
+            [1 if unread else 0] + chunk,
+        )
+    conn.commit()
+    conn.close()
+
 def get_activity_log(limit=100):
     conn = get_connection()
     rows = conn.execute(

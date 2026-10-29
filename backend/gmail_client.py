@@ -10,6 +10,7 @@ import time
 from database import load_emails
 import re
 from analytics import get_unsubscribe_link
+from googleapiclient.errors import HttpError
 
 from models import Email
 
@@ -453,3 +454,41 @@ class GmailClient:
                 break
 
         return changes, new_history_id
+
+    def get_current_labels(self, ids):
+        labels = {} # dict -> {id: [labelIds]}
+        gone = []
+        failed = []
+
+    def get_current_labels(self, ids):
+        labels = {}   # {id: [labelIds]}
+        gone = []     # permanently deleted, Gmail returns 404
+        failed = []   # anything else (rate limits etc.)
+
+        def handle(request_id, response, exception):
+            if exception is not None:
+                if isinstance(exception, HttpError) and exception.resp.status == 404:
+                    gone.append(request_id)
+                else:
+                    failed.append(request_id)
+                return
+            labels[request_id] = response.get("labelIds", [])
+
+        for i in range(0, len(ids), 25): # sends requests in batches of 25
+            chunk = ids[i:i + 25]
+            batch = self.service.new_batch_http_request(callback=handle) # make an empty placeholder that would hold up to 25 requests & when result comes back call handle for each one 
+            # for each message in batch put it in the placeholder 
+            for msg_id in chunk:
+                # no .execute after .get because the request is just build here not sent
+                batch.add(
+                    self.service.users().messages().get(userId="me", id=msg_id, format="minimal"), # minimal cos it returns only id and labelids
+                    request_id=msg_id, #label each request for handle
+                )
+            batch.execute() # send the batch to gmail as one HTTP call 
+            time.sleep(1) # wait before next chunk
+
+        if failed: # raising means history_id never updates
+            # crash on purpose so history_id doesn't move forward, next sync retries these
+            raise RuntimeError(f"couldn't get labels for {len(failed)} emails, will retry next sync")
+
+        return labels, gone

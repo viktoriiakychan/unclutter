@@ -1,16 +1,4 @@
-import { useState, useEffect } from "react";
-
-export default function SyncProgress({ API }) {
-  const [progress, setProgress] = useState({ synced: 0, total: 0, running: false });
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetch(`${API}/sync/progress`)
-        .then((r) => r.json())
-        .then(setProgress);
-    }, 1500);
-    return () => clearInterval(interval);
-  }, []);
+export default function SyncProgress({ progress }) {
 
   if (!progress.running || progress.type !== "full") return null;
 

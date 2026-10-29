@@ -388,46 +388,58 @@ def background_sync(sync_days=None):
                 if deleted_ids:
                     database.delete_emails(deleted_ids)
 
-                added_ids = list({item["message"]["id"] for item in changes["added"]})
-                if added_ids:
-                    email_objs = client._fetch_full([{"id": i} for i in added_ids])
-                    database.save_emails(email_objs)
+                touched = {
+                    item["message"]["id"]
+                    for item in changes["added"] + changes["labels_added"] + changes["labels_removed"]
+                }
+                touched -= set(deleted_ids)   # already gone, nothing to check
+
+                if touched:
+                    # ask Gmail what's true NOW instead of replaying events
+                    current, gone = client.get_current_labels(list(touched))
+
+                    if gone:
+                        database.delete_emails(gone)
+
+                    existing = database.get_existing_ids()
+                    to_delete, to_unarchive, to_archive, to_fetch = [], [], [], []
+                    unread_ids, read_ids = [], []
+
+                    for msg_id, labels in current.items():
+                        if "TRASH" in labels or "SPAM" in labels:
+                            to_delete.append(msg_id)
+                            continue
+
+                        if "INBOX" in labels:
+                            if msg_id in existing:
+                                to_unarchive.append(msg_id)
+                            else:
+                                to_fetch.append(msg_id)   # new, or restored from trash
+                        else:
+                            to_archive.append(msg_id)     # no-op if it's not in the DB
+
+                        if "UNREAD" in labels:
+                            unread_ids.append(msg_id)
+                        else:
+                            read_ids.append(msg_id)
+
+                    if to_delete:
+                        database.delete_emails(to_delete)
+                    if to_unarchive:
+                        database.mark_unarchived(to_unarchive)
+                    if to_archive:
+                        database.mark_archived(to_archive)
+                    if to_fetch:
+                        database.save_emails(client._fetch_full([{"id": i} for i in to_fetch]))
+                    if unread_ids:
+                        database.set_unread(unread_ids, True)
+                    if read_ids:
+                        database.set_unread(read_ids, False)
 
                 conn = database.get_connection()
-                cursor = conn.cursor()
-                for item in changes["labels_added"]:
-                    label_ids = item.get("labelIds", [])
-                    msg_id = item["message"]["id"]
-
-                    if "UNREAD" in label_ids:
-                        cursor.execute("UPDATE emails SET unread = 1 WHERE id = ?", (msg_id,))
-                    if "TRASH" in label_ids:
-                        conn.commit()
-                        database.delete_emails([msg_id])
-                    if "INBOX" in label_ids:
-                        cursor.execute("SELECT id FROM emails WHERE id = ?", (msg_id,))
-                        exists = cursor.fetchone()
-                        if exists:
-                            conn.commit()
-                            database.mark_unarchived([msg_id])
-                        else:
-                            conn.commit()
-                            restored = client._fetch_full([{"id": msg_id}])
-                            if restored:
-                                database.save_emails(restored)
-
-                for item in changes["labels_removed"]:
-                    label_ids = item.get("labelIds", [])
-                    msg_id = item["message"]["id"]
-                    if "UNREAD" in label_ids:
-                        cursor.execute("UPDATE emails SET unread = 0 WHERE id = ?", (msg_id,))
-                    if "INBOX" in label_ids:
-                        conn.commit()
-                        database.mark_archived([msg_id])
-
-                cursor.execute(
+                conn.execute(
                     "UPDATE sync_state SET value = ? WHERE key = 'history_id'",
-                    (new_history_id,)
+                    (new_history_id,),
                 )
                 conn.commit()
                 conn.close()
