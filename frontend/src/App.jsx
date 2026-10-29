@@ -46,48 +46,19 @@ function App() {
       phaseRef.current = phase;
   }, [phase]);
 
+  const [syncProgress, setSyncProgress] = useState({ synced: 0, total: 0, running: false, type: null });
+
+  // every 30s: start a sync and watch it until it's done (progress is only checked while a sync runs)
   useEffect(() => {
     const interval = setInterval(() => {
       if (phaseRef.current === "ready") {
-        triggerSync().then(() => refetchEmails());
+        syncAndWait();
       }
     }, 30000);
     return () => clearInterval(interval);
   }, []);
 
-
-
-  const wasRunning = useRef(false);
-
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const res = await fetch(`${API}/sync/progress`);
-      const progress = await res.json();
-      setSyncProgress(progress);
-
-      // refetch while running, and once more right after it stops
-      if (progress.running || wasRunning.current) {
-        refetchEmails();
-      }
-      wasRunning.current = progress.running;
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-const [syncProgress, setSyncProgress] = useState({ synced: 0, total: 0, running: false, type: null });
-
-useEffect(() => {
-    function checkProgress() {
-      fetch(`${API}/sync/progress`)
-        .then((r) => r.json())
-        .then(setSyncProgress);
-    }
-    checkProgress();
-    const interval = setInterval(checkProgress, 1000);
-    return () => clearInterval(interval);
-}, []);
-
-const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
+  const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
 
   // cheap — just reads your own DB, safe to poll often
   async function refetchEmails() {
@@ -97,9 +68,36 @@ const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
     return data;
   }
 
-  // expensive — talks to Gmail, only call when you actually mean to sync
-  async function triggerSync() {
-    await fetch(`${API}/sync/start`, { method: "POST" });
+  const isSyncing = useRef(false);
+
+  async function syncAndWait(body = {}) {
+    if (isSyncing.current) return;   // don't start a second one on top
+    isSyncing.current = true;
+
+    try {
+      await fetch(`${API}/sync/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      // watch it until it's done
+      while (true) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const res = await fetch(`${API}/sync/progress`);
+        const progress = await res.json();
+        setSyncProgress(progress);
+
+        if (!progress.running) break;
+        if (progress.type === "full") refetchEmails();   // show emails filling in during the big first sync
+      }
+
+      refetchEmails();   // one final refresh once it's finished
+    } catch (err) {
+      console.error("sync failed:", err);
+    } finally {
+      isSyncing.current = false;
+    }
   }
 
   async function checkLogin() {
@@ -136,7 +134,7 @@ const syncMostlyDone = !(syncProgress.running && syncProgress.type === "full");
       console.error("Failed to fetch user email:", err);
     }
 
-    triggerSync();
+    syncAndWait();
   }
 
   if (phase === "checking") return <CenterMessage text="Checking login..." />;
@@ -263,11 +261,7 @@ async function handleRangeSelected(days) {
       return;
     }
 
-    await fetch(`${API}/sync/start`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ days }),
-    });
+    syncAndWait({ days });
 }
 
   return (
