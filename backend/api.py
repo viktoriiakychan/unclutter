@@ -568,5 +568,20 @@ def message_count():
     except RuntimeError:
         return jsonify({"count": None})
 
+@app.route("/range-estimates")
+def range_estimates():
+    try:
+        client = GmailClient()
+        client.connect()
+    except RuntimeError:
+        return jsonify({"error": "not_logged_in"}), 401
+
+    try:
+        return jsonify(client.get_range_estimates([30, 90, 180, 365, 730]))
+    except HttpError as e:
+        if "rateLimitExceeded" in str(e):
+            return jsonify({"error": "rate_limited"}), 429   # 429 = "too many requests"
+        raise
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000, threaded=True)

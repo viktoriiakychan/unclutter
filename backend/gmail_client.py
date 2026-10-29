@@ -487,3 +487,42 @@ class GmailClient:
             raise RuntimeError(f"couldn't get labels for {len(failed)} emails, will retry next sync")
 
         return labels, gone
+
+    def get_inbox_count(self):
+        # exact number of emails in the inbox (not the whole mailbox)
+        label = self.service.users().labels().get(userId="me", id="INBOX").execute()
+        return label.get("messagesTotal", 0)
+
+    def count_messages(self, query, cap):
+        # count matching inbox emails by listing their ids, stop once we pass the cap
+        count = 0
+        page_token = None
+        while True:
+            results = self.service.users().messages().list(
+                userId="me",
+                labelIds=["INBOX"],
+                q=query,
+                maxResults=500,
+                pageToken=page_token,
+                fields="messages/id,nextPageToken",   # only send back ids, keeps it light
+            ).execute()
+
+            count += len(results.get("messages", []))
+            page_token = results.get("nextPageToken")
+            if not page_token or count >= cap:
+                return min(count, cap)
+
+    def get_range_estimates(self, day_options, cap=2000):
+        counts = {}
+        hit_cap = False
+
+        for days in sorted(day_options):          # smallest range first
+            if hit_cap:
+                counts[str(days)] = cap           # bigger ranges contain the smaller one
+                continue
+            counts[str(days)] = self.count_messages(f"newer_than:{days}d", cap)
+            hit_cap = counts[str(days)] >= cap
+
+        counts["all"] = self.get_inbox_count()    # exact, from the INBOX label
+        counts["cap"] = cap                       # so the frontend knows when to show "2,000+"
+        return counts
