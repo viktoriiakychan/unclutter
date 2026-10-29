@@ -213,7 +213,7 @@ async function handleRangeSelected(days) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      <Sidebar userEmail={userEmail} onSignOut={handleSignOut} />
       <div className="flex-1 min-w-0 overflow-hidden">
         <Header userEmail={userEmail} onSignIn={handleSignIn} onSignOut={handleSignOut} />
         <SyncProgress progress={syncProgress}/>
