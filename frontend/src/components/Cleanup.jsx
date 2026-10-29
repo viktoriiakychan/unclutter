@@ -252,7 +252,12 @@ export default function Cleanup({ emails, refetchEmails }) {
                         {isArchiving && <LoadingOverlay action="archive" />} */}
 
                         {/* page title */}
-                       
+                        <div className="mb-6">
+                            <h1 className="text-2xl font-bold text-gray-900">Clean up</h1>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Suggested cleanups you can act on now, or filter to find your own
+                            </p>
+                        </div>
 
                         {/* suggestion cards*/}
                         <div>

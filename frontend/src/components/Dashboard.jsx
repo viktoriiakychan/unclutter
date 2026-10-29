@@ -1,26 +1,17 @@
 import { useState, useEffect, useRef } from "react";
-import { NavLink } from 'react-router-dom'
 
-import unreadIcon from "../assets/unread-message.png";
-import newsletterIcon from "../assets/newspaper.png";
-import promotionIcon from "../assets/promotions.png";
-import totalIcon from "../assets/email.png";
-import searchIcon from "../assets/search.png";
-import clearIcon from "../assets/close.png";
-import rightArrowIcon from "../assets/right-arrow-blue.png";
-
-import StatCard from "./StatCard";
-import Header from "./Header";
 import CenterMessage from "./CenterMessage";
-import Sidebar from "./Sidebar";
-import LoadingOverlay from "./LoadingOverlay";
 
 import HealthCard from "./HealthCard";
 import MetricCard from "./MetricCard";
+import EmailsPanel from "./EmailsPanel";
+import SelectionBar from "./SelectionBar";
+import UnsubscribeCard from "./UnsubscribeCard";
+import WorstOffenderCard from "./WorstOffenderCard";
+import { EMAIL_FILTERS } from "../utils/categories";
+import ConfirmDialog from "./ConfirmDialog";
 
-
-import { API, FILTERS, CATEGORIES } from "../utils/constants";
-import { timeAgo } from "../utils/helpers";
+import { API } from "../utils/constants";
 
 function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
 // stats computed from the real data
@@ -54,7 +45,6 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
 
     const listRef = useRef(null);
 
-
     const [healthScore, setHealthScore] = useState(() => {
     const cached = localStorage.getItem("healthScore");
         return cached ? Number(cached) : null;
@@ -68,19 +58,17 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
         return cached ? JSON.parse(cached) : null;
     });
 
-    const showRealHealth = syncMostlyDone && healthScore !== null && emails.length > 0;
     useEffect(()=> {
         fetch(`${API}/unsubscribe-list`)
         .then((r) => r.json())
         .then((data) => setUnsubscribeList(data));
     }, [emails.length]);
 
-
     useEffect(() => {
         fetch(`${API}/activity`)
         .then((r) => r.json())
         .then((data) => setActivityLog(data));
-    }, []);
+    }, [emails.length]);
     
     useEffect(()=> {
         fetch(`${API}/health-score`)
@@ -110,11 +98,11 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
         });
     }, [emails.length]);
 
-
     if (!userEmail || !activityLog || healthScore == null || flaggedCount == null) {
             return <CenterMessage text="Loading your dashboard..." />;
     }
 
+    const selectedUnread = selectedIds.filter((id) => emails.find((e) => e.id === id)?.unread).length;
 
     // async function handleUnsubscribeClick(e, sender_email, link) {
     //     e.preventDefault(); // stop the <a> from navigating immediately
@@ -134,50 +122,17 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
 
     // }
 
+    const currentFilter = EMAIL_FILTERS.find((f) => f.name === activeFilter) || EMAIL_FILTERS[0];
+    const search = senderSearch.toLowerCase();
+
     const filteredEmails = emails.filter((email) => {
-        let matchesFilter = true;
-
-        if (activeFilter === "Unread") {
-        matchesFilter = email.unread;
-        } 
-        else if (activeFilter === "Newsletter") {
-        matchesFilter = email.is_newsletter;
-        } 
-        else if (activeFilter === "Promotions") {
-        matchesFilter = email.category === "promotions" && !email.is_newsletter;
-        } 
-        else if (activeFilter === "Updates") {
-        matchesFilter = email.category === "updates" && !email.is_newsletter;
-        } 
-        else if (activeFilter === "Older than 30 days") {
-        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-        matchesFilter = Number(email.internal_date) < thirtyDaysAgo;
-        }
-
-        const search = senderSearch.toLowerCase();
         const matchesSearch =
-        (email.sender_name || "").toLowerCase().includes(search) ||
-        (email.subject || "").toLowerCase().includes(search) ||
-        (email.sender_email || "").toLowerCase().includes(search);
+            (email.sender_name || "").toLowerCase().includes(search) ||
+            (email.subject || "").toLowerCase().includes(search) ||
+            (email.sender_email || "").toLowerCase().includes(search);
 
-        return matchesFilter && matchesSearch;
-
-        return true;
+        return currentFilter.test(email) && matchesSearch;
     });
-
-    function getCount(category)
-    {
-        if(category === "Newsletter")
-        {
-        return newsletterCount;
-        }
-        return emails.filter((email) => email.category === category.toLowerCase() && !email.is_newsletter).length;
-    }
-
-        function getPercentage(categoryCount, category)
-        {
-            return ((categoryCount / emails.length) * 100).toFixed(0);
-        }
 
     function toggleSelect(id) 
     {
@@ -219,6 +174,13 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
             setDeletingIds([]);
         }
     }
+
+    function showFilter(name) {
+        setActiveFilter(name);
+        setSenderSearch("");
+        listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    
     function handleCleanWorst() {
         if (!worstOffender) return;
         const ids = emails
@@ -228,6 +190,11 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
         setActiveFilter("All");
         setSenderSearch(worstOffender.sender_email);   // show only their emails
         setSelectedIds(ids);                           // tick them all, the action bar pops up
+        listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    function showFilter(name) {
+        setActiveFilter(name);
+        setSenderSearch(""); // clear any search, e.g. one left over from "Clean now"
         listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
@@ -314,79 +281,35 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
 
 return (
     <>
-        {showDeleteConfirm && (
-            <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50">
-                <div className="bg-white rounded-xl shadow-xl p-6 w-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Are you sure?
-                </h3>
-                <p className="text-sm text-gray-500 mb-6">
-                    You're deleting {selectedIds.length} emails, including{" "}
-                    <span className="font-semibold text-gray-900">
-                        {selectedIds.filter(id => emails.find(e => e.id === id)?.unread).length} unread
-                    </span>{" "}
-                    emails
-                </p>
-                <div className="flex justify-end gap-3">
-                    <button
-                        className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-100"
-                        onClick={() => setShowDeleteConfirm(false)}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700"
-                        onClick={() => {
-                            setShowDeleteConfirm(false);
-                            handleDelete();
-                        }}                   
-                    >
-                        Confirm
-                    </button>
-                </div>
-                </div>
-            </div>
-        )}
+        <ConfirmDialog
+            open={showDeleteConfirm}
+            action="delete"
+            count={selectedIds.length}
+            unreadCount={selectedUnread}
+            onCancel={() => setShowDeleteConfirm(false)}
+            onConfirm={() => {
+                setShowDeleteConfirm(false);
+                handleDelete();
+            }}
+        />
 
-        {showArchiveConfirm && (
-            <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50">
-                <div className="bg-white rounded-xl shadow-xl p-6 w-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Are you sure?
-                </h3>
-                <p className="text-sm text-gray-500 mb-6">
-                    You're archiving {selectedIds.length} emails, including{" "}
-                    <span className="font-semibold text-gray-900">
-                        {selectedIds.filter(id => emails.find(e => e.id === id)?.unread).length} unread
-                    </span>{" "}
-                    emails
-                </p>
-                <div className="flex justify-end gap-3">
-                    <button
-                        className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-100"
-                        onClick={() => setShowArchiveConfirm(false)}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        className="px-4 py-2 rounded-lg bg-gray-500 text-white text-sm font-medium hover:bg-gray-600"
-                        onClick={() => {
-                            setShowArchiveConfirm(false);
-                            handleArchive();
-                        }}                   
-                    >
-                        Confirm
-                    </button>
-                </div>
-                </div>
-            </div>
-        )}
+        <ConfirmDialog
+            open={showArchiveConfirm}
+            action="archive"
+            count={selectedIds.length}
+            unreadCount={selectedUnread}
+            onCancel={() => setShowArchiveConfirm(false)}
+            onConfirm={() => {
+                setShowArchiveConfirm(false);
+                handleArchive();
+            }}
+        />
 
         <div className="flex-1 min-h-0 flex bg-slate-50 text-gray-800 overflow-hidden">
         {/* RIGHT SIDE */}
         <div className="flex-1 flex flex-col overflow-hidden">
             {/* MAIN CONTENT */}
-            <main className="flex-1 p-6 pb-16 overflow-y-auto overflow-x-hidden">
+            <main className="flex-1 p-6 px-8 pb-6 overflow-y-auto overflow-x-hidden">
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
                 <div className="lg:col-span-3">
@@ -395,271 +318,68 @@ return (
 
                 <div className="lg:col-span-2 grid grid-cols-2 gap-4">
                     <MetricCard label="Total" value={emails.length} sub="in your inbox"
-                    onClick={() => setActiveFilter("All")} active={activeFilter === "All"} />
+                    onClick={() => showFilter("All")} active={activeFilter === "All"} />
                     <MetricCard label="Unread" dotClass="bg-blue-600" valueClass="text-blue-600"
                     value={unreadCount} sub={`${unreadPct}% of inbox`}
-                    onClick={() => setActiveFilter("Unread")} active={activeFilter === "Unread"} />
+                    onClick={() => showFilter("Unread")} active={activeFilter === "Unread"} />
                     <MetricCard label="Newsletters" dotClass="bg-amber-500"
-                    value={newsletterCount} sub={`${newsletterSenders} senders`}
-                    onClick={() => setActiveFilter("Newsletter")} active={activeFilter === "Newsletter"} />
+                    value={newsletterCount} sub={`${newsletterSenders} ${newsletterSenders === 1 ? "sender" : "senders"}`}
+                    onClick={() => showFilter("Newsletter")} active={activeFilter === "Newsletter"} />
                     <MetricCard label="Promotions" dotClass="bg-pink-500"
-                    value={promotionsCount} sub={`${promotionSenders} senders`}
-                    onClick={() => setActiveFilter("Promotions")} active={activeFilter === "Promotions"} />
+                    value={promotionsCount} sub={`${promotionSenders} ${promotionSenders === 1 ? "sender" : "senders"}`}
+                    onClick={() => showFilter("Promotions")} active={activeFilter === "Promotions"} />
                 </div>
                 </div>
 
-            {/* TWO COLUMN: email list (left) + panels (right) */}
-            <div className="grid grid-cols-3 gap-6 items-start">
-
-                {/* LEFT — email list */}
-                <div ref={listRef} className="col-span-2 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden">
-                
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-                        <h2 className="font-semibold text-gray-900">My Emails</h2>
-                        <span className="text-sm text-gray-500">{emails.length} total</span>
-                    </div>
-
-                    <div className="flex items-center justify-between px-5 py-2 border-b border-gray-200">
-                        {FILTERS.map((filter) => (
-                        <button
-                            key={filter.name}
-                            onClick={() => setActiveFilter(filter.name)}
-                            className={`text-[10px] px-3 py-0.5 rounded-full font-medium flex-shrink-0 border ${
-                            activeFilter === filter.name
-                                ? filter.active // if match it gets the colour
-                                : `text-gray-700 border-gray-500 ${filter.hover}` // if not match go grey 
-                            }`}
-                        >
-                            {filter.name}
-                        </button>
-                        ))}
-                        <div className="relative max-w-40">
-
-                        <input
-                            type="text"
-                            value={senderSearch}
-                            onChange={(e) => setSenderSearch(e.target.value)}
-                            placeholder="Search by sender"
-                            className="px-2 py-1 text-sm max-w-40 max-h-6 outline-none text-[10px] text-gray-500 border-b border-gray-400 focus:border-blue-400"
-                        />
-                        {senderSearch ? (
-                            <img
-                            src={clearIcon}
-                            alt="search"
-                            className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
-                            />
-                        ):
-                        (
-                            <img
-                            src={searchIcon}
-                            alt="search"
-                            className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
-                            />
-                        )}
-                        </div>
-                    </div>
-
-                    <div className="relative">
-                        {isDeleting && <LoadingOverlay action="delete" />}
-                        {isArchiving && <LoadingOverlay action="archive" />}
-
-                        {emails.length === 0 ? (
-                            <div className="flex items-center justify-center py-12 text-sm text-gray-400">
-                                Waiting for your first emails to sync...
-                            </div>
-                            ) : (
-                            <div className="relative max-h-79 overflow-y-auto">
-
-                            {filteredEmails.map((email) => {
-                                const isSelected = selectedIds.includes(email.id);
-
-                            return (
-                                <div
-                                    key={email.id}
-                                    onClick={() => toggleSelect(email.id)}
-                                    className={`flex items-center gap-4 px-5 py-3 border-b border-gray-100 cursor-pointer transition-colors ${
-                                        isSelected ? "bg-blue-50" : "hover:bg-gray-50"
-                                    }`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={() => toggleSelect(email.id)}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400 flex-shrink-0 cursor-pointer"
-                                    />
-
-                                <span
-                                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                    email.unread ? "bg-blue-500" : "bg-transparent"
-                                    }`}
-                                ></span>
-
-                                <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
-                                    {email.sender_name ? email.sender_name[0].toUpperCase() : "?"}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    
-                                    <div className="text-xs text-gray-400 truncate">{email.sender_name}</div>
-                                    {email.unread ? (
-                                        <div className="text-sm font-medium text-gray truncate">{email.subject}</div>
-                                    ) : (
-                                        <div className="text-sm font-normal text-gray truncate">{email.subject}</div>
-                                    )}
-                                </div>
-                                
-                                {email.is_newsletter ? (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium flex-shrink-0">
-                                    newsletter
-                                    </span>
-                                ) : (
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${
-                                        email.category === "promotions" ? "bg-yellow-100 text-yellow-700" :
-                                        email.category === "social"     ? "bg-purple-100 text-purple-700" :
-                                        email.category === "updates"    ? "bg-green-100 text-green-700" :
-                                        "bg-gray-100 text-gray-700"
-                                    }`}> 
-                                        {email.category}
-                                    </span>
-                                )}
-
-                                <span className="text-[10px] py-0.5 font-small text-gray-400 flex-shrink-0">
-                                    {timeAgo(email.internal_date)}
-                                    </span>
-                                
-                                </div>
-                            );
-                            })}
-                        </div>
-                            )}
-                    </div>
-                    
-                    <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200">
-                        <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={allSelected}
-                                    onChange={toggleSelectAll}
-                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400 cursor-pointer"
-                                />
-                                <span className="text-sm text-gray-600">Select all</span>
-                            </label>
-                            <span className="text-m text-gray-500"></span>
-                            {selectedIds.length > 0 && (
-                                <span className="text-sm text-gray-500">{selectedIds.length} selected</span>
-                            )}
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <button 
-                                disabled={selectedIds.length === 0 || isArchiving || isDeleting}
-                                onClick={() => setShowArchiveConfirm(true)}
-                                className="px-10 py-1 rounded-lg border border-gray-600/40 bg-gray-600/10 text-gray-600 text-sm font-medium hover:bg-gray-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-600/10"
-
-                            >
-                            {isArchiving ? "Archiving..." : "Archive"}
-                            </button>
-
-                            <button
-                                onClick={() => setShowDeleteConfirm(true)}
-                                disabled={selectedIds.length === 0 || isArchiving || isDeleting}
-                                className="px-10 py-1 rounded-lg border border-red-600/40 bg-red-600/10 text-red-600 text-sm font-medium hover:bg-red-600/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600/10"
-                            >
-                            {isDeleting ? "Deleting..." : "Delete"}
-                            </button>
-                        </div>
-                    </div>
-
+            {/* ROW 2: worst offender (same 3/5 width as the health card) + unsubscribe */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6 items-stretch">
+                <div className="lg:col-span-3">
+                    <WorstOffenderCard
+                        offender={worstOffender}
+                        inboxTotal={emails.length}
+                        onCleanNow={handleCleanWorst}
+                        onUnsubscribe={() => handleUnsubscribeClick(worstOffender.sender_email)}
+                        canUnsubscribe={unsubscribeList.some((u) => u.sender_email === worstOffender?.sender_email)}
+                    />
                 </div>
-
-                {/* RIGHT — two stacked panels */}
-                <div className="space-y-4">
-
-                    {/* panel 1 — inbox health */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-gray-900">Inbox health</h3>
-                        {showRealHealth ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-medium">
-                                {flaggedCount} flagged
-                            </span>
-                        ) : (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium animate-pulse">
-                                calculating...
-                            </span>
-                        )}
-                    </div>
-
-                    {showRealHealth ? (
-                        <>
-                            <div className="flex items-baseline gap-1 mb-1">
-                                <span className="text-4xl font-bold text-red-500">{Math.round(healthScore)}</span>
-                                <span className="text-sm text-gray-400 font-medium">/100</span>
-                            </div>
-                            <p className="text-sm text-gray-500 mb-4">
-                                {worstOffender && worstOffender.sender_name ? (
-                                    <>
-                                        <span className="font-semibold text-gray-800">{worstOffender.sender_name}</span> is your worst offender — {worstOffender.total_emails} emails, {worstOffender.unread_rate}% unread.
-                                    </>
-                                ) : (
-                                    "No offenders yet — your inbox is looking clean."
-                                )}
-                            </p>
-                        </>
-                    ) : (
-                        <>
-                            <div className="flex items-baseline gap-2 mb-1 animate-pulse">
-                                <div className="h-9 w-16 bg-gray-200 rounded" />
-                                <div className="h-4 w-8 bg-gray-200 rounded" />
-                            </div>
-                            <div className="h-4 w-full bg-gray-200 rounded mb-1 mt-3 animate-pulse" />
-                            <div className="h-4 w-2/3 bg-gray-200 rounded mb-4 animate-pulse" />
-                        </>
-                    )}
-
-                    <NavLink
-                        to="/top-senders"
-                        className="flex items-center justify-between w-full px-4 py-2 rounded-lg border border-blue-400 text-blue-500 text-sm font-medium hover:bg-blue-50"
-                    >
-                        See top senders
-                        <img src={rightArrowIcon} alt="" className="w-5 h-5" />
-                    </NavLink>
-                </div>
-
-                    {/* panel 2 — unsubscribe */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-5 max-h-60 overflow-y-auto">
-                        <h3 className="font-semibold text-gray-900 mb-4">Unsubscribe</h3>
-                        {unsubscribeList.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-6 text-center">
-                                <p className="text-sm text-gray-500">No newsletters to unsubscribe from</p>
-                                <p className="text-xs text-gray-400 mt-1">You're all caught up here</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3 text-sm">
-                                {unsubscribeList.map((item) =>(
-                                    <div key={item.sender_email} className="flex items-center justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <div className="text-[12px] text-gray-700 truncate">{item.sender_name}</div>
-                                            <div className="text-[10px] text-gray-400 truncate">{item.sender_email}</div>
-                                        </div>
-
-                                        <div className="flex items-center gap-3 flex-shrink-0">
-                                            <span className="w-6 text-right text-xs text-gray-400">{item.count}</span>
-                                            <button
-                                                onClick={() => handleUnsubscribeClick(item.sender_email)}
-                                                className="px-2 py-1 rounded-lg border border-blue-400 text-blue-500 text-xs font-medium hover:bg-blue-50"
-                                            >
-                                                Unsubscribe
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                <div className="lg:col-span-2">
+                    <UnsubscribeCard
+                        list={unsubscribeList}
+                        emails={emails}
+                        onUnsubscribe={handleUnsubscribeClick}
+                    />
                 </div>
             </div>
+
+            {/* ROW 3: emails, full width. The section keeps the floating bar inside the emails area */}
+            <section className="relative overflow-clip">
+                <EmailsPanel
+                    emails={emails}
+                    filteredEmails={filteredEmails}
+                    activeFilter={activeFilter}
+                    onFilterChange={setActiveFilter}
+                    search={senderSearch}
+                    onSearchChange={setSenderSearch}
+                    selectedIds={selectedIds}
+                    onToggle={toggleSelect}
+                    allSelected={allSelected}
+                    onToggleAll={toggleSelectAll}
+                    isArchiving={isArchiving}
+                    isDeleting={isDeleting}
+                    listRef={listRef}
+                />
+
+                {/* outside the email card on purpose: sticky keeps it on screen while you scroll the page */}
+                {selectedIds.length > 0 && (
+                    <SelectionBar
+                        count={selectedIds.length}
+                        onArchive={() => setShowArchiveConfirm(true)}
+                        onDelete={() => setShowDeleteConfirm(true)}
+                        onClear={() => setSelectedIds([])}
+                        disabled={isArchiving || isDeleting}
+                    />
+                )}
+            </section>
             </main>
         </div>
         </div>

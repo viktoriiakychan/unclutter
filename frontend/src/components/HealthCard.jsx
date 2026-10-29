@@ -107,14 +107,14 @@ export default function HealthCard({ score, worstOffender, onCleanNow }) {
           {showSuggestion && (
             <button
               onClick={onCleanNow}
-              className="bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-sm transition"
+              className="bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-sm font-semibold px-8 py-1.5 rounded-lg shadow-sm transition"
             >
               Clean now
             </button>
           )}
           <Link
             to="/top-senders"
-            className="bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-800 text-sm font-medium px-5 py-2.5 rounded-xl transition"
+            className="bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-800 text-sm font-medium px-5 py-1.5 rounded-lg   transition"
           >
             See top senders →
           </Link>

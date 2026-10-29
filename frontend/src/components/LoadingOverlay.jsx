@@ -10,7 +10,7 @@ export default function LoadingOverlay({ action = "delete", message, fullScreen 
 
   const positionClasses = fullScreen
     ? "fixed inset-0 z-50"
-    : "absolute inset-0 max-h-80 z-40";
+    : "absolute inset-0 z-40";
 
   return (
     <div
