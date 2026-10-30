@@ -14,7 +14,7 @@ import os
 import urllib.request
 
 app = Flask(__name__) # create the web application 
-CORS(app)
+CORS(app, origins=["http://localhost:5173"])
 
 database.create_table()
 database.create_activity_table()
@@ -452,6 +452,10 @@ def background_sync(sync_days=None):
             sync_progress["type"] = "full"
             start_history_id = client.get_profile()["historyId"]
             message_stubs = client.list_all_message_ids(days=sync_days)
+            # gets ids with emails that have attachments
+            attachment_ids = {
+                m["id"] for m in client.list_all_message_ids(days=sync_days, extra_query="has:attachment")
+            }
             sync_progress["total"] = len(message_stubs)
 
             saved_count = {"value": 0}
@@ -470,7 +474,8 @@ def background_sync(sync_days=None):
                 message_stubs,
                 on_progress=update_progress,
                 on_batch=save_batch,
-                should_stop=lambda: sync_cancelled.is_set()
+                should_stop=lambda: sync_cancelled.is_set(),
+                full_ids=attachment_ids,
             )
 
             if sync_cancelled.is_set():

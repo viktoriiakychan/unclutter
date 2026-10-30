@@ -21,6 +21,12 @@ class GmailClient:
         "https://www.googleapis.com/auth/gmail.modify"
     ]
 
+    UNITS_PER_SECOND = 90
+    BATCH_SIZE = 10
+    METADATA_COST = 20
+    FULL_COST = 60
+    HEADERS = ["From", "Subject", "Date", "List-Unsubscribe", "List-Unsubscribe-Post"]
+
     def __init__(self):
         self.creds = None
         self.service = None
@@ -129,12 +135,19 @@ class GmailClient:
         messages = results.get("messages", [])
         return self._fetch_full(messages) 
 
-    def list_all_message_ids(self, days=None):
+    def list_all_message_ids(self, days=None, should_stop=None, extra_query=None):
         message_ids = []
         page_token = None
-        query = f"newer_than:{days}d" if days else None
+        retries = 0
+        # e.g. "newer_than:30d has:attachment"
+        parts = [f"newer_than:{days}d"] if days else []
+        if extra_query:
+            parts.append(extra_query)
+        query = " ".join(parts) or None
 
         while True:
+            if should_stop and should_stop():
+                return []  # sync was cancelled (e.g. logout)
             try:
                 results = self.service.users().messages().list(
                     userId="me",
@@ -144,9 +157,14 @@ class GmailClient:
                     pageToken=page_token
                 ).execute()
             except Exception as e:
-                if "rateLimitExceeded" in str(e):
-                    print("Rate limited on list — backing off 60s")
-                    time.sleep(60)
+                if "rateLimitExceeded" in str(e) and retries < 5:
+                    retries += 1
+                    print(f"Rate limited on list, backing off 60s (attempt {retries}/5)")
+                    # sleep in small steps so a logout doesn't have to wait a full minute
+                    for _ in range(60):
+                        if should_stop and should_stop():
+                            return []
+                        time.sleep(1)
                     continue  # retry the same page
                 raise
 
@@ -219,81 +237,99 @@ class GmailClient:
         conn.commit()
         conn.close()
 
-    def _fetch_full(self, messages, on_progress=None, on_batch=None, should_stop=None):
+    def _fetch_full(self, messages, on_progress=None, on_batch=None, should_stop=None, full_ids=None):
         full_messages = {}
-        failed_ids = []
+        rate_limited = set()  # ids Gmail said "slow down" for, in the current batch
+
+        first_error = []  # only print one, otherwise it floods the terminal
 
         def handle_response(request_id, response, exception):
             if exception is not None:
+                if not first_error:
+                    first_error.append(True)
+                    print("First Gmail error:", exception)
                 if "rateLimitExceeded" in str(exception) or "429" in str(exception):
-                    failed_ids.append(request_id)
+                    rate_limited.add(request_id)
                 else:
-                    print("Failed to fetch", request_id, exception)
+                    print("Failed to fetch", request_id, exception)  # e.g. deleted since we listed it
                 return
             full_messages[request_id] = response
 
-        for i in range(0, len(messages), 25):
+        queue = [m["id"] for m in messages]  
+        attempts = {}                       
+        gave_up = []
+        all_emails = []
+        slowdown = 1.0                       
+
+        while queue:
             if should_stop and should_stop():
                 break
 
-            chunk = messages[i:i+25]
+            chunk, queue = queue[:self.BATCH_SIZE], queue[self.BATCH_SIZE:]
+            rate_limited.clear()
+
             batch = self.service.new_batch_http_request(callback=handle_response)
-            for message in chunk:
-                batch.add(
-                    self.service.users().messages().get(userId="me", id=message["id"]),
-                    request_id=message["id"]
-                )
-            started = time.monotonic() # starts a stopwatch
-            batch.execute() # ask gmail for next 25 emails
+            batch_cost = 0  # quota units this batch will use
+            for msg_id in chunk:
+                # if no
+                if full_ids is None or msg_id in full_ids:
+                    # has attachments: need the full email to see the attachment names and sizes
+                    request = self.service.users().messages().get(userId="me", id=msg_id, format="full")
+                    batch_cost += self.FULL_COST
+                else:
+                    # no attachments: headers are all we need, and it's 3x cheaper
+                    request = self.service.users().messages().get(
+                        userId="me", id=msg_id, format="metadata", metadataHeaders=self.HEADERS
+                    )
+                    batch_cost += self.METADATA_COST
+                batch.add(request, request_id=msg_id)
 
-            batch_failed = [m["id"] for m in chunk if m["id"] not in full_messages] # emails that failef
+            started = time.monotonic()
+            batch.execute()
+            elapsed = time.monotonic() - started
 
-            if len(batch_failed) > len(chunk) // 2: #if more than half failed - back off for 30 secs
-                print(f"Rate limited, backing off 30s ({len(batch_failed)}/{len(chunk)} failed)")
-                time.sleep(30)
+            # anything Gmail rate limited goes to the back of the queue to try again later
+            for msg_id in rate_limited:
+                attempts[msg_id] = attempts.get(msg_id, 0) + 1
+                if attempts[msg_id] < 5:
+                    queue.append(msg_id)
+                else:
+                    gave_up.append(msg_id)
+
+            if rate_limited:
+                slowdown = min(slowdown * 2, 8)      # Gmail is complaining: go twice as slow
+                print(f"Rate limited ({len(rate_limited)}/{len(chunk)}), slowing down x{slowdown:.1f}")
             else:
-                elapsed = time.monotonic() - started # check how much the reuqest took
-                time.sleep(max(0, 1.5 - elapsed))
+                slowdown = max(slowdown * 0.9, 1.0)  # all good: speed back up a little
+
+            # wait long enough that we spend at most UNITS_PER_SECOND. e.g. 200 units / 90 = ~2.2s
+            wait = batch_cost / self.UNITS_PER_SECOND * slowdown
+            time.sleep(max(0, wait - elapsed))
 
             if should_stop and should_stop():
                 print("Sync cancelled, discarding this batch")
                 break
 
-            batch_emails = [self._parse_message(full_messages[m["id"]]) for m in chunk if m["id"] in full_messages]
+            batch_emails = []
+            for msg_id in chunk:
+                if msg_id not in full_messages:
+                    continue
+                msg = full_messages.pop(msg_id)  # pop = free the memory, we don't need the raw email after this
+                email = self._parse_message(msg)
+                batch_emails.append(email)
+                if email.attachment_count >= 1:
+                    self._save_attachments_from_payload(email.id, msg.get("payload", {}).get("parts", []))
 
-            # save attachments from data already in memory
-            for email in batch_emails:
-                if email.attachment_count >= 1 and email.id in full_messages:
-                    payload = full_messages[email.id].get("payload", {})
-                    self._save_attachments_from_payload(email.id, payload.get("parts", []))
-
-            if on_batch:
+            all_emails.extend(batch_emails)
+            if on_batch and batch_emails:
                 on_batch(batch_emails)
             if on_progress:
-                on_progress(min(i+25, len(messages)))
+                on_progress(len(all_emails))
 
-        # retry anything that got rate-limited, once, after a short cooldown
-        if failed_ids:
-            print(f"Retrying {len(failed_ids)} rate-limited emails...")
-            time.sleep(30)
+        if gave_up:
+            print(f"Gave up on {len(gave_up)} emails after 5 rate limits each")
 
-            for i in range(0, len(failed_ids), 25):
-                chunk = failed_ids[i:i+25]
-                retry_batch = self.service.new_batch_http_request(callback=handle_response)
-                for msg_id in chunk:
-                    retry_batch.add(
-                        self.service.users().messages().get(userId="me", id=msg_id),
-                        request_id=msg_id
-                    )
-                retry_batch.execute()
-                time.sleep(3)
-
-            retried_emails = [self._parse_message(full_messages[mid]) for mid in failed_ids if mid in full_messages]
-            if on_batch and retried_emails:
-                on_batch(retried_emails)
-
-        emails = [self._parse_message(full_messages[m["id"]]) for m in messages if m["id"] in full_messages]
-        return emails
+        return all_emails
 
     def get_all_emails(self, on_progress=None):
         message_ids=self.list_all_message_ids()

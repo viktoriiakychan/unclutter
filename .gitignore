@@ -23,3 +23,5 @@ __pycache__/
 *.exe
 node_modules/
 dist/
+
+NOTES.md
