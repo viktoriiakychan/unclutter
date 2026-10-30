@@ -10,6 +10,9 @@ import UnsubscribeCard from "./UnsubscribeCard";
 import WorstOffenderCard from "./WorstOffenderCard";
 import { EMAIL_FILTERS } from "../utils/Categories";
 import { API } from "../utils/constants";
+import { unsubscribeFrom, unsubscribeMessage, unsubscribeError } from "../utils/Unsubscribe";
+import { useToast } from "./Toast";
+
 
 // read a number/object cached from the last visit, so the cards aren't empty on load
 function cached(key, parse = Number) {
@@ -17,13 +20,13 @@ function cached(key, parse = Number) {
         const value = localStorage.getItem(key);
         return value == null ? null : parse(value);
     } catch {
-        return null;
+        return null;    
     }
 }
 
 function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
-    // true while the first sync is still running, the cards show grey blocks
     const pending = !syncMostlyDone;
+    const showToast = useToast();
 
     // stats computed from the real data
     const unreadCount = emails.filter((e) => e.unread).length;
@@ -165,24 +168,15 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
     const handleArchive = () => runBulk("/archive", "archive", setIsArchiving);
 
     async function handleUnsubscribeClick(sender_email) {
-        const res = await fetch(`${API}/unsubscribe`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sender_email }),
-        });
-        const data = await res.json();
+        const name = unsubscribeList.find((u) => u.sender_email === sender_email)?.sender_name || sender_email;
 
-        if (data.method === "link") {
-            // sender doesn't support one-click: user finishes on their site
-            window.open(data.url, "_blank", "noopener,noreferrer");
-            await fetch(`${API}/dismiss-sender`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sender_email }),
-            });
+        try {
+            const method = await unsubscribeFrom(sender_email);
+            setUnsubscribeList((prev) => prev.filter((item) => item.sender_email !== sender_email));
+            showToast({ message: unsubscribeMessage(method, name) });
+        } catch (err) {
+            alert(unsubscribeError(err, name));
         }
-
-        setUnsubscribeList((prev) => prev.filter((item) => item.sender_email !== sender_email));
     }
 
     return (
@@ -294,7 +288,7 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
                     </section>
 
                     {/* order-first: on narrow screens the cards still come before the long list */}
-                    <aside className="lg:col-span-2 flex flex-col gap-4 order-first lg:order-none lg:min-h-0 lg:overflow-y-auto">
+                    <aside className="lg:col-span-2 flex flex-col gap-4 order-first lg:order-none lg:min-h-0">
                         <WorstOffenderCard
                             offender={worstOffender}
                             inboxTotal={emails.length}

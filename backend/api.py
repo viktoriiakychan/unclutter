@@ -231,7 +231,7 @@ def unsubscribe():
     conn = database.get_connection()
     row = conn.execute("""
         SELECT unsubscribe, one_click FROM emails
-        WHERE sender_email = ? AND unsubscribe != ''
+        WHERE sender_email = ? AND unsubscribe LIKE '%https://%'
         ORDER BY internal_date DESC LIMIT 1
     """, (sender_email,)).fetchone()
     conn.close()

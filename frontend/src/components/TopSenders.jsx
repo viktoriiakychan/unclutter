@@ -5,6 +5,8 @@ import { useToast } from "./Toast";
 import { timeAgo } from "../utils/helpers";
 import { API } from "../utils/constants";
 
+import { unsubscribeFrom, unsubscribeMessage, unsubscribeError } from "../utils/Unsubscribe";
+
 const TABS = [
     { key: "all", label: "All", test: () => true },
     { key: "high_noise", label: "High noise", test: (s) => s.is_flagged },
@@ -290,35 +292,20 @@ export default function TopSenders({ emails, refetchEmails }) {
     }
 
     async function handleUnsubscribe(sender) {
-        const { sender_email } = sender;
-        setUnsubscribingEmail(sender_email);
+      const { sender_email } = sender;
+      const name = sender.sender_name || sender_email;
+      setUnsubscribingEmail(sender_email);
 
-        try {
-            const res = await fetch(`${API}/unsubscribe`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sender_email }),
-            });
-            const data = await res.json();
-
-            if (data.method === "link") {
-                // sender doesn't support one-click: user finishes on their site
-                window.open(data.url, "_blank", "noopener,noreferrer");
-                await fetch(`${API}/dismiss-sender`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sender_email }),
-                });
-            }
-
-            // the button goes away, but the sender stays: their old emails still count as noise
-            setSenders((prev) => prev.map((s) => (s.sender_email === sender_email ? { ...s, can_unsubscribe: false } : s)));
-            showToast({ message: `Unsubscribed from ${sender.sender_name || sender_email}` });
-        } catch {
-            alert("Couldn't unsubscribe right now, try again in a minute.");
-        } finally {
-            setUnsubscribingEmail(null);
-        }
+      try {
+          const method = await unsubscribeFrom(sender_email);
+          // the button goes away, but the sender stays: their old emails still count as noise
+          setSenders((prev) => prev.map((s) => (s.sender_email === sender_email ? { ...s, can_unsubscribe: false } : s)));
+          showToast({ message: unsubscribeMessage(method, name) });
+      } catch (err) {
+          alert(unsubscribeError(err, name)); // no success toast when nothing happened
+      } finally {
+          setUnsubscribingEmail(null);
+      }
     }
 
     return (
