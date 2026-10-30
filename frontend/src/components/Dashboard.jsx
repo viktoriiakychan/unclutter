@@ -8,7 +8,7 @@ import SelectionBar from "./SelectionBar";
 import ConfirmDialog from "./ConfirmDialog";
 import UnsubscribeCard from "./UnsubscribeCard";
 import WorstOffenderCard from "./WorstOffenderCard";
-import { EMAIL_FILTERS } from "../utils/categories";
+import { EMAIL_FILTERS } from "../utils/Categories";
 import { API } from "../utils/constants";
 
 // read a number/object cached from the last visit, so the cards aren't empty on load

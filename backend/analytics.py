@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
-from collections import Counter
+from database import ME
 
 LOCAL_TZ = ZoneInfo("Europe/Dublin")
 
@@ -196,7 +196,7 @@ def get_oldest_unread_days(conn, days=30):
 def get_cleaned_up_count(conn, days=30):
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     return conn.execute(
-        "SELECT COUNT(*) FROM activity_log WHERE timestamp >= ?", (cutoff,)
+        f"SELECT COUNT(*) FROM activity_log WHERE timestamp >= ? AND account_email = {ME}", (cutoff,)
     ).fetchone()[0]
 
 def get_avg_emails_per_day(conn, days=30):
@@ -357,10 +357,10 @@ def get_sender_noise_scores(conn, min_emails=5):
     """, (min_emails,))
     base_rows = cursor.fetchall()
 
-    cursor.execute("""
+    cursor.execute(f"""
         SELECT sender_email, COUNT(*) as deleted_count
         FROM activity_log
-        WHERE action_type = 'deleted'
+        WHERE action_type = 'deleted' AND account_email = {ME}
         GROUP BY sender_email
     """)
     deleted_map = {row[0]: row[1] for row in cursor.fetchall()}

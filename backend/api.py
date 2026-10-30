@@ -376,7 +376,7 @@ def background_sync(sync_days=None):
 
                 deleted_ids = list({item["message"]["id"] for item in changes["deleted"]})
                 if deleted_ids:
-                    database.delete_emails(deleted_ids)
+                    database.delete_emails(deleted_ids, log=False)
 
                 touched = {
                     item["message"]["id"]
@@ -389,7 +389,7 @@ def background_sync(sync_days=None):
                     current, gone = client.get_current_labels(list(touched))
 
                     if gone:
-                        database.delete_emails(gone)
+                        database.delete_emails(gone, log=False)
 
                     existing = database.get_existing_ids()
                     to_delete, to_unarchive, to_archive, to_fetch = [], [], [], []
@@ -414,11 +414,11 @@ def background_sync(sync_days=None):
                             read_ids.append(msg_id)
 
                     if to_delete:
-                        database.delete_emails(to_delete)
+                        database.delete_emails(to_delete, log=False)
                     if to_unarchive:
                         database.mark_unarchived(to_unarchive)
                     if to_archive:
-                        database.mark_archived(to_archive)
+                        database.mark_archived(to_archive, log=False)
                     if to_fetch:
                         database.save_emails(client._fetch_full([{"id": i} for i in to_fetch]))
                     if unread_ids:

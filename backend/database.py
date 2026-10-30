@@ -202,40 +202,41 @@ def get_existing_ids():
 
     return {row[0] for row in rows} # a set of ids 
 
-def delete_emails(ids):
+def delete_emails(ids, log=True):                     
     conn = get_connection()
     
-    for i in range(0, len(ids), 900): # loop over chuncks = faster, 900 cos sqllite only allows 999 ? marks in one query 
+    for i in range(0, len(ids), 900):
         chunk = ids[i:i + 900]
-        ph = ",".join("?" for _ in chunk) # placeholder 
-        conn.execute(f"""
-            INSERT INTO activity_log (email_id, thread_id, sender_name, sender_email, subject, date,
-                unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
-                internal_date, action_type, account_email)
-            SELECT id, thread_id, sender_name, sender_email, subject, date,
-                unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
-                internal_date, 'deleted', {ME}
-            FROM emails WHERE id IN ({ph})
-        """, chunk)
-        conn.execute(f"DELETE FROM emails WHERE id IN ({ph})", chunk)
+        ph = ",".join("?" for _ in chunk)
+        if log:                                       
+            conn.execute(f"""                        
+                INSERT INTO activity_log (email_id, thread_id, sender_name, sender_email, subject, date,
+                    unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
+                    internal_date, action_type, account_email)
+                SELECT id, thread_id, sender_name, sender_email, subject, date,
+                    unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
+                    internal_date, 'deleted', {ME}
+                FROM emails WHERE id IN ({ph})
+            """, chunk)                               # <-- ...to here is indented one more level
+        conn.execute(f"DELETE FROM emails WHERE id IN ({ph})", chunk)   # <-- UNCHANGED, not inside the if
     conn.commit()
     conn.close()
 
-
-def mark_archived(ids):
+def mark_archived(ids, log=True):
     conn = get_connection()
     for i in range(0, len(ids), 900):
         chunk = ids[i:i + 900]
         ph = ",".join("?" for _ in chunk)
-        conn.execute(f"""
-            INSERT INTO activity_log (email_id, thread_id, sender_name, sender_email, subject, date,
-                unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
-                internal_date, action_type, account_email)
-            SELECT id, thread_id, sender_name, sender_email, subject, date,
-                unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
-                internal_date, 'archived', {ME}
-            FROM emails WHERE id IN ({ph}) AND is_archived = 0
-        """, chunk)
+        if log:
+            conn.execute(f"""
+                INSERT INTO activity_log (email_id, thread_id, sender_name, sender_email, subject, date,
+                    unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
+                    internal_date, action_type, account_email)
+                SELECT id, thread_id, sender_name, sender_email, subject, date,
+                    unread, category, attachment_count, attachment_size, is_newsletter, unsubscribe,
+                    internal_date, 'archived', {ME}
+                FROM emails WHERE id IN ({ph}) AND is_archived = 0
+            """, chunk)
         conn.execute(f"UPDATE emails SET is_archived = 1 WHERE id IN ({ph})", chunk)
     conn.commit()
     conn.close()

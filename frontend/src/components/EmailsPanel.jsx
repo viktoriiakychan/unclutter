@@ -1,6 +1,6 @@
 import LoadingOverlay from "./LoadingOverlay";
 import EmailRow from "./EmailRow";
-import { EMAIL_FILTERS } from "../utils/categories";
+import { EMAIL_FILTERS } from "../utils/Categories";
 
 function SearchIcon() {
   return (
