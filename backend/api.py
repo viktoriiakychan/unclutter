@@ -450,6 +450,7 @@ def background_sync(sync_days=None):
 
         if needs_full_sync:
             sync_progress["type"] = "full"
+            start_history_id = client.get_profile()["historyId"]
             message_stubs = client.list_all_message_ids(days=sync_days)
             sync_progress["total"] = len(message_stubs)
 
@@ -477,13 +478,13 @@ def background_sync(sync_days=None):
                 return
 
             try:
-                profile = client.get_profile()
                 conn = database.get_connection()
                 conn.execute("DELETE FROM sync_state WHERE key = 'history_id'")
                 conn.execute(
                     "INSERT INTO sync_state (key, value) VALUES ('history_id', ?)",
-                    (profile["historyId"],)
+                    (start_history_id,)   # the one from BEFORE the sync, not a fresh one
                 )
+            
                 conn.commit()
                 conn.close()
                 database.set_last_synced()
