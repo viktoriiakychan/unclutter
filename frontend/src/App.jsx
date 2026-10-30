@@ -261,7 +261,7 @@ async function handleRangeSelected(days) {
           <Route path="/cleanup" element={<Cleanup emails={emails} refetchEmails={refetchEmails}/>} />
           <Route path="/activity" element={<Activity refetchEmails={refetchEmails} />} />
           <Route path="/inbox-stats" element={<InboxStats />} />
-          <Route path="/top-senders" element={<TopSenders refetchEmails={refetchEmails} />} />
+          <Route path="/top-senders" element={<TopSenders emails={emails} refetchEmails={refetchEmails} />} />
         </Routes>
       </div>
     </div>
