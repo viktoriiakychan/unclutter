@@ -243,15 +243,17 @@ class GmailClient:
                     self.service.users().messages().get(userId="me", id=message["id"]),
                     request_id=message["id"]
                 )
-            batch.execute()
-            #time.sleep(0.5)
+            started = time.monotonic() # starts a stopwatch
+            batch.execute() # ask gmail for next 25 emails
 
-            batch_failed = [m["id"] for m in chunk if m["id"] not in full_messages]
-            if len(batch_failed) > len(chunk) // 2:
-                print(f"Rate limited — backing off 30s ({len(batch_failed)}/{len(chunk)} failed)")
+            batch_failed = [m["id"] for m in chunk if m["id"] not in full_messages] # emails that failef
+
+            if len(batch_failed) > len(chunk) // 2: #if more than half failed - back off for 30 secs
+                print(f"Rate limited, backing off 30s ({len(batch_failed)}/{len(chunk)} failed)")
                 time.sleep(30)
             else:
-                time.sleep(3)
+                elapsed = time.monotonic() - started # check how much the reuqest took
+                time.sleep(max(0, 1.5 - elapsed))
 
             if should_stop and should_stop():
                 print("Sync cancelled, discarding this batch")
