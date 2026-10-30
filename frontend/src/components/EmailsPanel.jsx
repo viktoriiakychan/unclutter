@@ -37,7 +37,7 @@ export default function EmailsPanel({
   const hasSelection = selectedIds.length > 0;
 
   return (
-    <div ref={listRef} className="relative bg-white rounded-2xl flex flex-col overflow-hidden lg:h-[620px]">
+    <div ref={listRef} className="relative bg-white rounded-2xl flex flex-col overflow-hidden lg:h-full">
 
       {/* header */}
       <div className="flex items-center justify-between gap-4 px-5 pt-5">

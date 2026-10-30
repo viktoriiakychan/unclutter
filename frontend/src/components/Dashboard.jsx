@@ -210,7 +210,7 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
                 }}
             />
 
-            <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-canvas text-gray-800 px-8 pt-4 pb-16">
+            <main className="flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden bg-canvas text-gray-800 px-8 pt-4 pb-6">
                 {/* ROW 1: health (3/5) + four tiles (2/5) */}
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
                     <div className="lg:col-span-3">
@@ -263,9 +263,9 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
                 </div>
 
                 {/* ROW 2: emails (3/5, under the health card) + insights column (2/5, under the tiles) */}
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:flex-1 lg:min-h-[560px] lg:grid-rows-[minmax(0,1fr)]">
                     {/* the section keeps the floating selection bar inside the emails column */}
-                    <section className="relative overflow-clip lg:col-span-3">
+                    <section className="relative overflow-clip lg:col-span-3 lg:min-h-0">
                         <EmailsPanel
                             emails={emails}
                             filteredEmails={filteredEmails}
@@ -294,7 +294,7 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
                     </section>
 
                     {/* order-first: on narrow screens the cards still come before the long list */}
-                    <aside className="lg:col-span-2 flex flex-col gap-4 order-first lg:order-none">
+                    <aside className="lg:col-span-2 flex flex-col gap-4 order-first lg:order-none lg:min-h-0 lg:overflow-y-auto">
                         <WorstOffenderCard
                             offender={worstOffender}
                             inboxTotal={emails.length}
