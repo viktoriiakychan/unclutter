@@ -31,6 +31,16 @@ const BRAND_BLUE = "#2563eb";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// unlock the app once this many emails are in, the rest keeps loading in the background
+const UNLOCK_AT = 300;
+
+// enough to start? 300 emails, or all of them if the inbox (or range) is smaller than that
+function enoughLoaded(progress) {
+  if (!progress.running || progress.type !== "full") return false;
+  const target = progress.total ? Math.min(UNLOCK_AT, progress.total) : UNLOCK_AT;
+  return progress.synced >= target;
+}
+
 async function atLeast(ms, promise) {
   const [result] = await Promise.all([promise, sleep(ms)]);
   return result;
@@ -81,7 +91,9 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const syncMostlyDone = !(firstSync || (syncProgress.running && syncProgress.type === "full"));
+  // blurred while a full sync is still loading its first emails, unblurred after that
+  const fullSyncRunning = syncProgress.running && syncProgress.type === "full";
+  const syncMostlyDone = !firstSync && (!fullSyncRunning || enoughLoaded(syncProgress));
 
   // cheap — just reads your own DB, safe to poll often
   async function refetchEmails() {
@@ -117,6 +129,7 @@ function App() {
         const res = await fetch(`${API}/sync/progress`);
         const progress = await res.json();
         setSyncProgress(progress);
+        if (enoughLoaded(progress)) setFirstSync(false);   // first emails are in, let the user start
 
         if (!progress.running) break;
         if (progress.type === "full") refetchEmails();   // show emails filling in during the big first sync
