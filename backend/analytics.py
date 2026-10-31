@@ -426,22 +426,27 @@ def get_worst_offender(conn, min_emails=5):
     return worst
 
 def get_inbox_health_score(conn):
-    # unread 
-    unread_stats = get_unread_stats(conn, days=30) 
-    unread_pct = unread_stats["percentageUnread"]  # already 0-100
-    
-    # noise
-    senders = get_sender_noise_scores(conn)
-    avg_noise = sum(s["noise_score"] for s in senders) / len(senders) if senders else 0
-    
-    conn.close()
-    
-    health_score = round(100 - (unread_pct * 0.5 + avg_noise * 0.5), 1)
+    total_synced, unread_in_inbox = conn.execute("""
+        SELECT COUNT(*),
+               COALESCE(SUM(CASE WHEN unread = 1 AND is_archived = 0 THEN 1 ELSE 0 END), 0)
+        FROM emails
+    """).fetchone()
+
+    deleted = conn.execute(
+        f"SELECT COUNT(*) FROM activity_log WHERE action_type = 'deleted' AND account_email = {ME}"
+    ).fetchone()[0]
+
+    total = total_synced + deleted
+    handled = total - unread_in_inbox
+    health_score = round(handled / total * 100, 1) if total else 100.0  # nothing synced yet = nothing to fix
+
     return {
         "health_score": health_score,
-        "backlog_pct": round(unread_pct, 1),
-        "avg_noise": round(avg_noise, 1),
+        "handled": handled,      # e.g. "6,300 of 9,000 emails dealt with"
+        "total": total,
+        "unread": unread_in_inbox,
     }
+
 def get_dismissed_senders(conn):
     cursor = conn.cursor()
     cursor.execute("SELECT sender_email, last_seen_email_date FROM dismissed_senders")
