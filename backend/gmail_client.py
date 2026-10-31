@@ -11,6 +11,7 @@ from database import load_emails
 import re
 from analytics import get_unsubscribe_link
 from googleapiclient.errors import HttpError
+import httplib2
 
 from models import Email
 
@@ -248,8 +249,9 @@ class GmailClient:
                 if not first_error:
                     first_error.append(True)
                     print("First Gmail error:", exception)
-                if "rateLimitExceeded" in str(exception) or "429" in str(exception):
-                    rate_limited.add(request_id)
+                server_error = isinstance(exception, HttpError) and exception.resp.status >= 500
+                if "rateLimitExceeded" in str(exception) or "429" in str(exception) or server_error:
+                    rate_limited.add(request_id)  # worth trying again later
                 else:
                     print("Failed to fetch", request_id, exception)  # e.g. deleted since we listed it
                 return
@@ -285,10 +287,13 @@ class GmailClient:
                 batch.add(request, request_id=msg_id)
 
             started = time.monotonic()
-            batch.execute()
+            try:
+                batch.execute()
+            except (OSError, httplib2.HttpLib2Error) as e:
+                print(f"Network error, retrying this batch later: {e}")
+                rate_limited.update(m for m in chunk if m not in full_messages)
             elapsed = time.monotonic() - started
 
-            # anything Gmail rate limited goes to the back of the queue to try again later
             for msg_id in rate_limited:
                 attempts[msg_id] = attempts.get(msg_id, 0) + 1
                 if attempts[msg_id] < 5:
@@ -297,7 +302,7 @@ class GmailClient:
                     gave_up.append(msg_id)
 
             if rate_limited:
-                slowdown = min(slowdown * 2, 8)      # Gmail is complaining: go twice as slow
+                slowdown = min(slowdown * 2, 8)      
                 print(f"Rate limited ({len(rate_limited)}/{len(chunk)}), slowing down x{slowdown:.1f}")
             else:
                 slowdown = max(slowdown * 0.9, 1.0)  # all good: speed back up a little

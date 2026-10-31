@@ -457,8 +457,16 @@ def background_sync(sync_days=None):
                 m["id"] for m in client.list_all_message_ids(days=sync_days, extra_query="has:attachment")
             }
             sync_progress["total"] = len(message_stubs)
+            already_have = []
+            if row is None:
+                existing = database.get_existing_ids()
+                already_have = [m for m in message_stubs if m["id"] in existing]
+                message_stubs = [m for m in message_stubs if m["id"] not in existing]
+                if already_have:
+                    print(f"Resuming: {len(already_have)} already saved, {len(message_stubs)} to go")
 
-            saved_count = {"value": 0}
+            saved_count = {"value": len(already_have)}
+            sync_progress["synced"] = saved_count["value"]
 
             def update_progress(count):
                 pass  # don't use this for display anymore
