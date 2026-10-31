@@ -2,13 +2,8 @@ import { useState } from "react";
 import { CATEGORY_STYLES } from "../utils/Categories";
 import { blurWhile } from "../utils/pending";
 
-const PREVIEW_COUNT = 3;
-
 export default function UnsubscribeCard({ list, emails, onUnsubscribe, syncing = false }) {
-  const [showAll, setShowAll] = useState(false);
   const [pending, setPending] = useState(null); // sender currently being unsubscribed
-
-  const visible = showAll ? list : list.slice(0, PREVIEW_COUNT);
 
   // unread count per sender, from the emails we already have
   function unreadFrom(senderEmail) {
@@ -41,9 +36,10 @@ export default function UnsubscribeCard({ list, emails, onUnsubscribe, syncing =
           <p className="text-xs text-gray-400 mt-1">You're all caught up here.</p>
         </div>
       ) : (
-        <>
-          <div className={`mt-3 -mx-2 flex-1 ${showAll ? "max-h-56 overflow-y-auto" : ""} ${blurWhile(syncing)}`}>
-            {visible.map((item) => {
+        // the list fills the card and scrolls inside it, so the card never changes size.
+        // max-h-72 is for small screens, where the card has no fixed height to fill
+        <div className={`mt-3 -mx-2 flex-1 min-h-0 overflow-y-auto max-h-72 lg:max-h-none ${blurWhile(syncing)}`}>
+            {list.map((item) => {
               const unread = unreadFrom(item.sender_email);
               const name = item.sender_name || item.sender_email;
               return (
@@ -68,17 +64,7 @@ export default function UnsubscribeCard({ list, emails, onUnsubscribe, syncing =
                 </div>
               );
             })}
-          </div>
-
-          {list.length > PREVIEW_COUNT && (
-            <button
-              onClick={() => setShowAll((s) => !s)}
-              className="mt-3 w-full text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg py-2 transition"
-            >
-              {showAll ? "Show less" : `See all ${list.length} →`}
-            </button>
-          )}
-        </>
+        </div>
       )}
     </div>
   );

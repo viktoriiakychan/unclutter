@@ -298,7 +298,7 @@ function Dashboard({ emails, refetchEmails, userEmail, syncMostlyDone }) {
                             pending={pending}
                         />
                         {/* flex-1 soaks up leftover height so the column ends level with the emails card */}
-                        <div className="flex-1">
+                        <div className="flex-1 min-h-0">
                             <UnsubscribeCard
                                 list={unsubscribeList}
                                 emails={emails}
